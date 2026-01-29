@@ -24,3 +24,11 @@ def upsert_features(city: str, features: dict):
         },
         upsert=True
     )   
+    # -----------------------------------
+# Feature freshness helper
+# -----------------------------------
+def get_feature_freshness(city: str):
+    return feature_store.find_one(
+        {"city": city},
+        {"_id": 0, "city": 1, "updated_at": 1}
+    )

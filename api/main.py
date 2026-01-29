@@ -1,65 +1,42 @@
 from fastapi import FastAPI
-from pipelines.inference import predict_aqi, predict_multi_aqi
+from datetime import datetime, timezone
+from db.mongo import feature_store
+from db.mongo import get_feature_freshness
 
-app = FastAPI(title="10Pearls AQI API")
-
-# -------------------------------------------------
-# ROOT
-# -------------------------------------------------
-@app.get("/")
-def root():
-    return {
-        "service": "10Pearls AQI API",
-        "status": "running",
-        "endpoints": [
-            "/health",
-            "/predict?horizon=1",
-            "/predict/multi",
-            "/models"
-        ]
-    }
-
-# -------------------------------------------------
-# HEALTH
-# -------------------------------------------------
-@app.get("/health")
-def health():
-    return {"status": "ok"}
-
-# -------------------------------------------------
-# SINGLE HORIZON
-# -------------------------------------------------
-@app.get("/predict")
-def predict(horizon: int = 1):
-    result = predict_aqi(horizon)
-
-    if result.get("status") == "error":
-        return result
-
-    return {
-        "predicted_aqi": result["predicted_aqi"],
-        "horizon_hours": result["horizon_hours"],
-        "model": result["model"],
-        "rmse": 11.26,
-        "r2": 0.736,
-        "status": "success"
-    }
-
-# -------------------------------------------------
-# MULTI HORIZON
-# -------------------------------------------------
-@app.get("/predict/multi")
-def predict_multi():
-    return predict_multi_aqi([1, 6, 24])
-
-# -------------------------------------------------
-# MODEL REGISTRY
-# -------------------------------------------------
-@app.get("/models")
-def list_models():
-    from db.mongo import model_registry
-    return list(model_registry.find({}, {"_id": 0}))
 @app.get("/features/freshness")
-def feature_freshness():
-    from db.mongo import get_feature_freshness
-    return get_feature_freshness("Karachi") or {}
+def feature_freshness(city: str = "Karachi"):
+    try:
+        doc = feature_store.find_one(
+            {"city": city},
+            {"_id": 0, "city": 1, "updated_at": 1}
+        )
+
+        if not doc or "updated_at" not in doc:
+            return {
+                "status": "no_data",
+                "message": f"No feature timestamp found for city={city}"
+            }
+
+        updated_at = doc["updated_at"]
+
+        # 🔒 Ensure timezone safety
+        if updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=timezone.utc)
+
+        now = datetime.now(timezone.utc)
+        age_minutes = round(
+            (now - updated_at).total_seconds() / 60, 2
+        )
+
+        return {
+            "status": "ok",
+            "city": city,
+            "updated_at": updated_at.isoformat(),
+            "age_minutes": age_minutes
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }
