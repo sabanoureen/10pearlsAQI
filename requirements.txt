@@ -6,3 +6,5 @@ scikit-learn
 joblib
 requests
 streamlit
+pymongo
+pymongo[srv]
