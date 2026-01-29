@@ -38,21 +38,24 @@ flowchart LR
     B --> C[Feature Engineering]
     C --> D[Final Feature Table]
 
-    D --> E[ML Models<br/>(Ridge Regression)]
+    D --> E[ML Models (Ridge Regression)]
     E --> F[FastAPI Inference Service]
 
-    F -->|/predict| G[Single AQI Prediction]
-    F -->|/predict/multi| H[Multi-Horizon Prediction]
+    F --> G[Single AQI Prediction]
+    F --> H[Multi-Horizon Prediction]
 
     F --> I[MongoDB Feature Store]
     I --> J[Feature Freshness API]
 
     J --> K[Streamlit Dashboard]
 
-    📡 API Endpoints
-🔹 Single Horizon Prediction
-GET /predict?horizon=24
-Response
+   ## 📡 API Endpoints
+
+### 🔹 Single Horizon Prediction
+**GET** `/predict?horizon=24`
+
+**Response**
+```json
 {
   "status": "ok",
   "city": "Karachi",
@@ -62,8 +65,9 @@ Response
   "timestamp": "2026-01-29T18:42:10Z"
 }
 
-🔹 Multi-Horizon Prediction
-GET /predict/multi?horizons=1&horizons=6&horizons=24
+
+###🔹 Multi-Horizon Prediction
+**GET** /predict/multi?horizons=1&horizons=6&horizons=24
 Response
 {
   "status": "success",
@@ -89,19 +93,26 @@ Response
   "age_minutes": 52.36
 }
 
-📊 Streamlit Dashboard
 
-The Streamlit dashboard visualizes:
+---
 
-Feature store freshness (Live / Delayed / Stale)
+### 📊 Streamlit Dashboard
 
-Last update timestamps
+```md
+## 📊 Streamlit Dashboard
 
-System health status
+The Streamlit dashboard acts as a **monitoring layer**, not just visualization.
 
-Used as a monitoring layer, not just visualization.
+It provides:
+- Feature store freshness status (**Live / Delayed / Stale**)
+- Last feature update timestamps
+- System health indicators
 
-🗂️ Project Structure
+This mirrors real-world ML monitoring practices used in production systems.
+
+## 🗂️ Project Structure
+
+
 10pearlsAQI/
 │
 ├── api/
@@ -126,29 +137,21 @@ Used as a monitoring layer, not just visualization.
 ├── requirements.txt
 └── README.md
 
-🧪 Tech Stack
+## 🧪 Tech Stack
 
-Backend: FastAPI
+**Backend:** FastAPI  
+**Machine Learning:** Scikit-learn (Ridge Regression)  
+**Database:** MongoDB (Feature Store)  
+**Frontend:** Streamlit  
+**Deployment:** Railway  
 
-ML: Scikit-learn (Ridge Regression)
+### MLOps Concepts
+- Feature Store
+- Feature Freshness Monitoring
+- Model Registry
+- Multi-Horizon Forecasting
 
-Database: MongoDB (Feature Store)
+## 👤 Author
 
-Frontend: Streamlit
-
-Deployment: Railway
-
-MLOps Concepts:
-
-Feature Store
-
-Feature Freshness
-
-Model Registry
-
-Multi-Horizon Forecasting
-
-👤 Author
-
-Saba Noureen
+**Saba Noureen**  
 Data Science & Machine Learning
