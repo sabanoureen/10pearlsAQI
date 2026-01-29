@@ -11,10 +11,10 @@ This project demonstrates **end-to-end MLOps thinking**:
 
 ## 🚀 Live Links
 
-- **FastAPI Documentation**
+- **FastAPI Documentation**  
   👉 https://10pearlsaqi-production-d27d.up.railway.app/docs
 
-- **Feature Freshness Endpoint**
+- **Feature Freshness Endpoint**  
   👉 https://10pearlsaqi-production-d27d.up.railway.app/features/freshness
 
 ---
