@@ -4,25 +4,20 @@ import json
 
 from pipelines.final_feature_table import build_final_dataframe
 from pipelines.horizon_feature_filter import filter_features_for_horizon
+from db.mongo import upsert_features   # ✅ Mongo
 
-
-# ======================================================
-# Multi-horizon inference
-# ======================================================
+# -------------------------------
+# MULTI-HORIZON
+# -------------------------------
 def predict_multi_aqi(horizons: list[int]):
     results = {}
 
     for h in horizons:
         res = predict_aqi(h)
-
-        if not isinstance(res, dict):
-            results[f"{h}h"] = {"error": "Internal inference failure"}
-            continue
-
         if res.get("status") == "success":
             results[f"{h}h"] = res["predicted_aqi"]
         else:
-            results[f"{h}h"] = {"error": res.get("message", "Unknown error")}
+            results[f"{h}h"] = {"error": res.get("message")}
 
     return {
         "city": "Karachi",
@@ -33,52 +28,43 @@ def predict_multi_aqi(horizons: list[int]):
         "status": "success"
     }
 
-
+# -------------------------------
+# SINGLE-HORIZON
+# -------------------------------
 def predict_aqi(horizon: int):
     try:
         df = build_final_dataframe()
-        if df is None or df.empty:
-            raise ValueError("Feature dataframe is empty")
-
         X = df.drop(columns=["aqi_pm25", "timestamp"], errors="ignore")
         X = filter_features_for_horizon(X, horizon)
 
-        feature_path = Path(f"models/ridge_h{horizon}/features.json")
-        if not feature_path.exists():
-            raise FileNotFoundError("Feature schema not found")
-
-        feature_order = json.loads(feature_path.read_text())
+        feature_order = json.loads(
+            Path(f"models/ridge_h{horizon}/features.json").read_text()
+        )
         X = X[feature_order]
-
         X_last = X.dropna().tail(1)
-        if X_last.empty:
-            raise ValueError("Not enough historical data")
+        print("✅ Saving features to MongoDB")
 
-        model_path = Path(f"models/ridge_h{horizon}/model.joblib")
-        if not model_path.exists():
-            raise FileNotFoundError("Model not found")
+        # ✅ THIS IS THE FEATURE STORE WRITE
+        upsert_features(
+            city="Karachi",
+            features=X_last.to_dict(orient="records")[0]
+        )
+        print("✅ Saving features to MongoDB")
 
-        model = joblib.load(model_path)
-        prediction = model.predict(X_last)[0]
+        model = joblib.load(f"models/ridge_h{horizon}/model.joblib")
+        pred = model.predict(X_last)[0]
 
-        # =========================================
-        # Lightweight horizon differentiation
-        # =========================================
         if horizon == 6:
-            prediction *= 1.03   # +3%
+            pred *= 1.03
         elif horizon == 24:
-            prediction *= 1.08  # +8%
+            pred *= 1.08
 
         return {
             "status": "success",
-            "predicted_aqi": round(float(prediction), 2),
+            "predicted_aqi": round(float(pred), 2),
             "horizon_hours": horizon,
             "model": "ridge_regression"
         }
 
     except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e),
-            "horizon_hours": horizon
-        }
+        return {"status": "error", "message": str(e)}

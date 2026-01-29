@@ -32,3 +32,14 @@ def train_and_return_model(horizon: int):
 
 # ❌ DO NOT TRAIN AT IMPORT TIME
 # ❌ NO model.fit() OUTSIDE FUNCTIONS
+
+from pipelines.register_model import register_model
+
+register_model(
+    model_name="ridge_regression",
+    horizon=horizon,
+    rmse=rmse,
+    r2=r2,
+    model_path=str(model_path),
+    features=feature_list
+)
