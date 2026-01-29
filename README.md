@@ -4,29 +4,31 @@ A **production-grade Air Quality Index (AQI) prediction platform** built with
 **FastAPI + Machine Learning + MongoDB + Streamlit**, deployed on **Railway**.
 
 This project demonstrates **end-to-end MLOps thinking**:
-data ingestion → feature engineering → model inference → feature store → monitoring → dashboard.
+
+**Data ingestion → Feature engineering → Model inference → Feature store → Monitoring → Dashboard**
 
 ---
 
 ## 🚀 Live Links
 
-- **API (FastAPI Docs)**  
+- **FastAPI Documentation**
   👉 https://10pearlsaqi-production-d27d.up.railway.app/docs
 
-- **Feature Freshness Endpoint**  
+- **Feature Freshness Endpoint**
   👉 https://10pearlsaqi-production-d27d.up.railway.app/features/freshness
 
 ---
 
 ## 🧠 Key Features
 
-✅ Multi-horizon AQI prediction (1h, 6h, 24h)  
-✅ Online **feature store** (MongoDB)  
-✅ Feature freshness monitoring API  
-✅ Streamlit monitoring dashboard  
-✅ Production-ready FastAPI service  
-✅ Modular ML pipelines  
-✅ Model registry & horizon-specific models  
+- ✅ Multi-horizon AQI prediction (**1h, 6h, 24h**)
+- ✅ Online **Feature Store** (MongoDB)
+- ✅ Feature freshness monitoring
+- ✅ Production-ready FastAPI service
+- ✅ Streamlit monitoring dashboard
+- ✅ Modular ML pipelines
+- ✅ Horizon-specific models & registry
+- ✅ Deployed on Railway
 
 ---
 
@@ -38,7 +40,7 @@ flowchart LR
     B --> C[Feature Engineering]
     C --> D[Final Feature Table]
 
-    D --> E[ML Models (Ridge Regression)]
+    D --> E[ML Models - Ridge Regression]
     E --> F[FastAPI Inference Service]
 
     F --> G[Single AQI Prediction]
