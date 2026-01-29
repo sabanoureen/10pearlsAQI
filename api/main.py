@@ -1,22 +1,75 @@
 from fastapi import FastAPI
 from datetime import datetime, timezone
+from typing import List
+
+from pipelines.inference import predict_aqi, predict_multi_aqi
 from db.mongo import feature_store
 
-# ✅ App MUST be defined first
-app = FastAPI()
-from pipelines.inference import predict_multi_aqi
-
-@app.get("/predict/multi")
-def predict_multi(horizons: str = "1,6,24"):
-    h_list = [int(h) for h in horizons.split(",")]
-
-    return predict_multi_aqi(h_list)
+# -----------------------------------
+# FastAPI App
+# -----------------------------------
+app = FastAPI(title="AQI Prediction API")
 
 # -----------------------------------
-# Feature Freshness API
+# SINGLE AQI PREDICTION
+# -----------------------------------
+@app.get("/predict")
+def predict(city: str = "Karachi", horizon: int = 24):
+    """
+    Predict AQI for a single horizon (hours)
+    """
+    result = predict_aqi(horizon)
+
+    if result["status"] != "success":
+        return {
+            "status": "error",
+            "message": result["message"]
+        }
+
+    return {
+        "status": "ok",
+        "city": city,
+        "horizon_hours": horizon,
+        "predicted_aqi": result["predicted_aqi"],
+        "model": result["model"],
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+# -----------------------------------
+# MULTI-HORIZON AQI PREDICTION
+# -----------------------------------
+@app.get("/predict/multi")
+def predict_multi(
+    city: str = "Karachi",
+    horizons: List[int] = [1, 6, 24]
+):
+    """
+    Example:
+    /predict/multi?horizons=1&horizons=6&horizons=24
+    """
+    result = predict_multi_aqi(horizons)
+
+    if result["status"] != "success":
+        return {
+            "status": "error",
+            "message": "Multi-horizon prediction failed"
+        }
+
+    return {
+        **result,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+# -----------------------------------
+# FEATURE FRESHNESS API
 # -----------------------------------
 @app.get("/features/freshness")
 def feature_freshness(city: str = "Karachi"):
+    """
+    Returns feature store freshness for a city
+    """
     doc = feature_store.find_one(
         {"city": city},
         {"_id": 0, "city": 1, "updated_at": 1}
@@ -29,39 +82,8 @@ def feature_freshness(city: str = "Karachi"):
         }
 
     updated_at = doc["updated_at"]
-    from fastapi import FastAPI
-from datetime import datetime
-from pipelines.inference import predict_aqi
 
-# app is already defined above
-# app = FastAPI()
-
-# -----------------------------------
-# AQI PREDICTION (SINGLE)
-# -----------------------------------
-@app.get("/predict")
-def predict(city: str = "Karachi", horizon: int = 24):
-    """
-    Simple AQI prediction endpoint
-    """
-    result = predict_aqi(horizon)
-
-    if result.get("status") != "success":
-        return {
-            "status": "error",
-            "message": result.get("message", "Prediction failed")
-        }
-
-    return {
-        "status": "ok",
-        "city": city,
-        "horizon_hours": horizon,
-        "predicted_aqi": result["predicted_aqi"],
-        "model": result["model"],
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-    # Ensure timezone-safe comparison
+    # Ensure timezone safety
     if updated_at.tzinfo is None:
         updated_at = updated_at.replace(tzinfo=timezone.utc)
 
