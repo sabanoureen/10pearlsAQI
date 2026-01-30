@@ -6,6 +6,8 @@ from pipelines.inference import predict_aqi, predict_multi_aqi
 from db.mongo import feature_store
 from pymongo.errors import PyMongoError
 from db.mongo import client
+from pathlib import Path
+
 
 
 # -----------------------------------
@@ -122,3 +124,35 @@ def health_check():
             "error": str(e),
             "timestamp": datetime.utcnow().isoformat()
         }
+# -----------------------------------
+# MODEL LISTING
+# -----------------------------------
+@app.get("/models")
+def list_models():
+    models_dir = Path("models")
+
+    models = []
+
+    if not models_dir.exists():
+        return {
+            "count": 0,
+            "models": [],
+            "message": "No models directory found"
+        }
+
+    for path in models_dir.glob("ridge_h*"):
+        try:
+            horizon = int(path.name.replace("ridge_h", ""))
+        except ValueError:
+            continue
+
+        models.append({
+            "model": "ridge_regression",
+            "horizon_hours": horizon,
+            "path": str(path)
+        })
+
+    return {
+        "count": len(models),
+        "models": sorted(models, key=lambda x: x["horizon_hours"])
+    }
