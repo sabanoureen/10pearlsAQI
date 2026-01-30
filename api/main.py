@@ -191,3 +191,6 @@ def get_best_model(horizon: int = 1):
         "status": "ok",
         "best_model": model
     }
+@app.get("/predict")
+def predict(horizon: int = 24, version: str | None = None):
+    return predict_aqi(horizon, version)
