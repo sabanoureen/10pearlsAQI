@@ -25,4 +25,5 @@ jobs:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          python pipelines/training_pipeline.py
+          python -m pipelines.training_pipeline
+
