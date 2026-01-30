@@ -8,3 +8,5 @@ requests
 streamlit
 pymongo
 pymongo[srv]
+xgboost
+xgboost==2.0.3
