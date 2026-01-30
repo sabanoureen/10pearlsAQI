@@ -1,13 +1,15 @@
 name: Feature Pipeline (Hourly)
-permissions:
-  contents: read
-  issues: write
 
 
 on:
   schedule:
     - cron: "0 * * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
 
 jobs:
   feature-pipeline:
