@@ -1,6 +1,5 @@
 name: Feature Pipeline (Hourly)
 
-
 on:
   schedule:
     - cron: "0 * * * *"
@@ -10,45 +9,25 @@ permissions:
   contents: read
   issues: write
 
-
 jobs:
   feature-pipeline:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: 🐍 Set up Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.11"
 
-      - name: 📦 Install dependencies
+      - name: Install dependencies
         run: |
           pip install -r requirements.txt
 
-      - name: ⚙️ Run feature pipeline
+      - name: Run feature pipeline
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
         run: |
           python pipelines/run_feature_pipeline.py
-
-      - name: 📤 Upload feature artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: feature-artifacts
-          path: data/features/
-
-      - name: 🚨 Create GitHub Issue on Failure
-        if: failure()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: "🚨 Feature Pipeline Failed",
-              body: "Hourly feature pipeline failed. Check logs."
-            })

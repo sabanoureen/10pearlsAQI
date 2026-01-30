@@ -1,12 +1,14 @@
 name: Training Pipeline (Daily)
-permissions:
-  contents: read
-  issues: write
 
 on:
   schedule:
     - cron: "0 2 * * *"   # Daily at 2 AM UTC
   workflow_dispatch:
+  
+permissions:
+  contents: read
+  issues: write
+
 
 jobs:
   training:

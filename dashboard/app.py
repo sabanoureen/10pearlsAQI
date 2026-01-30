@@ -1,47 +1,78 @@
 import streamlit as st
 import requests
-import pandas as pd
-import plotly.express as px
-from datetime import datetime, timedelta
 
-# -------------------------------
-# AQI COLOR & CATEGORY LOGIC
-# -------------------------------
-def aqi_category(aqi):
-    if aqi <= 50:
-        return "Good", "#2ECC71"
-    elif aqi <= 100:
-        return "Moderate", "#F1C40F"
-    elif aqi <= 150:
-        return "Unhealthy (Sensitive)", "#E67E22"
-    elif aqi <= 200:
-        return "Unhealthy", "#E74C3C"
-    elif aqi <= 300:
-        return "Very Unhealthy", "#8E44AD"
-    else:
-        return "Hazardous", "#7E0023"
-
-# -------------------------------
+# =====================================
 # CONFIG
-# -------------------------------
+# =====================================
+
 API_BASE_URL = "https://10pearlsaqi-production-d27d.up.railway.app"
+# For local testing:
+# API_BASE_URL = "http://127.0.0.1:8000"
 
 st.set_page_config(
-    page_title="AQI Forecast Dashboard",
+    page_title="AQI Feature Store Monitor",
     layout="wide",
 )
 
-# -------------------------------
+# =====================================
+# HELPERS
+# =====================================
+
+def fetch_feature_freshness():
+    try:
+        r = requests.get(
+            f"{API_BASE_URL}/features/freshness",
+            timeout=8
+        )
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        st.error(f"❌ Feature freshness error: {e}")
+        return None
+
+
+def fetch_best_model(horizon: int = 1):
+    try:
+        r = requests.get(
+            f"{API_BASE_URL}/models/best?horizon={horizon}",
+            timeout=8
+        )
+        r.raise_for_status()
+        data = r.json()
+
+        if data.get("status") != "ok":
+            return None
+
+        # 🔑 API returns "model"
+        return data.get("model")
+
+    except Exception as e:
+        st.error(f"❌ Best model fetch error: {e}")
+        return None
+
+
+def freshness_status(age_minutes):
+    if age_minutes is None:
+        return "Unknown", "#95A5A6"
+
+    if age_minutes <= 30:
+        return "Live", "#2ECC71"
+    elif age_minutes <= 60:
+        return "Delayed", "#F1C40F"
+    else:
+        return "Stale", "#E74C3C"
+
+
+# =====================================
 # SIDEBAR
-# -------------------------------
+# =====================================
+
 st.sidebar.title("⚙️ Configuration")
 
 city = st.sidebar.selectbox("City", ["Karachi"])
 st.sidebar.write("📍 Location: 24.8608, 67.0104")
 
-forecast_days = st.sidebar.slider("Forecast Days", 1, 3, 3)
-
-refresh = st.sidebar.button("🔄 Get Predictions")
+refresh = st.sidebar.button("🔄 Refresh Data")
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("API Status")
@@ -50,135 +81,77 @@ st.sidebar.success("🟢 API Connected")
 st.sidebar.markdown("---")
 st.sidebar.subheader("About")
 st.sidebar.info(
-    "This dashboard provides real-time AQI predictions "
-    "using machine learning models."
+    "This dashboard monitors feature freshness and "
+    "displays the automatically selected production model."
 )
 
-# -------------------------------
-# FETCH DATA
-# -------------------------------
-@st.cache_data(ttl=300)
-def fetch_forecast():
-    r = requests.get(f"{API_BASE_URL}/predict/multi", timeout=10)
-    r.raise_for_status()
-    return r.json()
+# =====================================
+# HEADER
+# =====================================
+
+st.title("🧪 AQI Feature Store Monitor")
+st.caption("Production ML system • Feature freshness & model registry")
+
+# =====================================
+# FEATURE STORE STATUS
+# =====================================
 
 if refresh:
     st.cache_data.clear()
 
-data = fetch_forecast()
-preds = data["predictions"]
+@st.cache_data(ttl=60)
+def cached_feature_freshness():
+    return fetch_feature_freshness()
 
-# -------------------------------
-# HEADER
-# -------------------------------
-st.title("🌫️ Air Quality Index Forecast")
-st.caption("Production AQI system • FastAPI + ML • Inspired by 10Pearls")
+fresh = cached_feature_freshness()
 
-# -------------------------------
-# METRICS
-# -------------------------------
-# -------------------------------
-# COLORED AQI METRICS
-# -------------------------------
-c1, c2, c3 = st.columns(3)
+if fresh and fresh.get("status") == "ok":
+    label, color = freshness_status(fresh["age_minutes"])
 
-for col, label, value in zip(
-    [c1, c2, c3],
-    ["1 Hour", "6 Hours", "24 Hours"],
-    [preds["1h"], preds["6h"], preds["24h"]],
-):
-    category, color = aqi_category(value)
-
-    col.markdown(
+    st.markdown(
         f"""
         <div style="
-            padding:18px;
-            border-radius:12px;
+            padding:24px;
+            border-radius:16px;
             background-color:{color};
             color:white;
             text-align:center;
-            box-shadow:0 4px 10px rgba(0,0,0,0.15)
+            box-shadow:0 6px 14px rgba(0,0,0,0.18)
         ">
-            <h4>AQI ({label})</h4>
-            <h1>{value}</h1>
-            <p>{category}</p>
+            <h3>Feature Store Status</h3>
+            <h1>{label}</h1>
+            <p><b>City:</b> {fresh['city']}</p>
+            <p><b>Age:</b> {fresh['age_minutes']} minutes</p>
+            <p><b>Last Updated:</b><br>{fresh['updated_at']}</p>
         </div>
         """,
         unsafe_allow_html=True
     )
-# -------------------------------
-# MODEL INFO
-# -------------------------------
-st.markdown("## 🧠 Model Information")
-
-m1, m2, m3 = st.columns(3)
-m1.metric("Best Model", "ridge_regression")
-m2.metric("R² Score", data["r2"])
-m3.metric("RMSE", data["rmse"])
-
-# -------------------------------
-# FORECAST DATA
-# -------------------------------
-dates = [datetime.utcnow().date() + timedelta(days=i) for i in range(forecast_days)]
-aqi_values = [round(preds["24h"])] * forecast_days
-
-df = pd.DataFrame({
-    "Date": dates,
-    "Predicted AQI": aqi_values
-})
-
-# -------------------------------
-# CHART
-# -------------------------------
-st.markdown("## 📈 AQI Forecast for Next Days")
-
-fig = px.bar(
-    df,
-    x="Date",
-    y="Predicted AQI",
-    text="Predicted AQI",
-    color_discrete_sequence=[aqi_category(preds["24h"])[1]],
-)
-
-fig.update_layout(
-    yaxis_title="AQI",
-    xaxis_title="Date",
-    showlegend=False
-)
-
-st.plotly_chart(fig, use_container_width=True)
-
-# -------------------------------
-# TABLE
-# -------------------------------
-st.markdown("## 📋 Forecast Details")
-
-df["Category"] = df["Predicted AQI"].apply(
-    lambda x: "Moderate" if x <= 100 else "Unhealthy"
-)
-
-st.dataframe(df, use_container_width=True)
-
-# -------------------------------
-# ALERTS
-# -------------------------------
-st.markdown("## 🚨 Alerts")
-
-if df["Predicted AQI"].max() > 150:
-    st.error("⚠️ Poor air quality expected. Limit outdoor activity.")
 else:
-    st.success("✅ No alerts – air quality within acceptable limits.")
+    st.warning("⚠️ Feature freshness unavailable")
 
-# -------------------------------
-# AQI INFO
-# -------------------------------
-with st.expander("ℹ️ About AQI Categories"):
-    st.markdown("""
-- **Good (0–50)**: Air quality is satisfactory  
-- **Moderate (51–100)**: Acceptable for most people  
-- **Unhealthy for Sensitive Groups (101–150)**  
-- **Unhealthy (151–200)**  
-- **Very Unhealthy (201–300)**  
-- **Hazardous (301+)**
-""")
+# =====================================
+# BEST MODEL DISPLAY
+# =====================================
+
+st.markdown("---")
+st.subheader("🧠 Best Model (Auto-Selected)")
+
+best_model = fetch_best_model(horizon=1)
+
+if best_model:
+    st.success(
+        f"""
+        **Model:** {best_model['model_name']}  
+        **RMSE:** {best_model['rmse']:.2f}  
+        **R²:** {best_model['r2']:.3f}  
+        **Status:** Production
+        """
+    )
+
+    st.caption(
+        f"Predictions generated using **{best_model['model_name']}** "
+        f"(RMSE={best_model['rmse']:.2f})"
+    )
+else:
+    st.warning("Best model information not available")
