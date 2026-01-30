@@ -156,3 +156,38 @@ def list_models():
         "count": len(models),
         "models": sorted(models, key=lambda x: x["horizon_hours"])
     }
+@app.get("/models/best")
+def get_best_model(horizon: int = 1):
+    from db.mongo import model_registry
+
+    model = model_registry.find_one(
+        {"horizon": horizon, "is_best": True},
+        {"_id": 0}
+    )
+
+    if not model:
+        return {"status": "not_found"}
+
+    return {"status": "ok", "model": model}
+# -----------------------------------
+# BEST MODEL INFO
+# -----------------------------------
+@app.get("/models/best")
+def get_best_model(horizon: int = 1):
+    from db.mongo import model_registry
+
+    model = model_registry.find_one(
+        {"horizon": horizon, "is_best": True},
+        {"_id": 0}
+    )
+
+    if not model:
+        return {
+            "status": "not_found",
+            "message": "No best model found"
+        }
+
+    return {
+        "status": "ok",
+        "best_model": model
+    }
