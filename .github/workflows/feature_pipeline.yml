@@ -1,4 +1,8 @@
 name: Feature Pipeline (Hourly)
+permissions:
+  contents: read
+  issues: write
+
 
 on:
   schedule:

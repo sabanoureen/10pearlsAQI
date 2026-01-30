@@ -1,4 +1,7 @@
 name: Training Pipeline (Daily)
+permissions:
+  contents: read
+  issues: write
 
 on:
   schedule:
