@@ -2,7 +2,7 @@ name: Feature Pipeline (Hourly)
 
 on:
   schedule:
-    - cron: "0 * * * *"   # Every hour at minute 0 (UTC)
+    - cron: "0 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -44,5 +44,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: "🚨 Feature Pipeline Failed",
-              body: "Hourly feature pipeline failed. Check GitHub Actions logs."
+              body: "Hourly feature pipeline failed. Check logs."
             })
