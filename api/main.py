@@ -4,6 +4,9 @@ from typing import List
 
 from pipelines.inference import predict_aqi, predict_multi_aqi
 from db.mongo import feature_store
+from pymongo.errors import PyMongoError
+from db.mongo import client
+
 
 # -----------------------------------
 # FastAPI App
@@ -96,3 +99,26 @@ def feature_freshness(city: str = "Karachi"):
         "updated_at": updated_at.isoformat(),
         "age_minutes": age_minutes
     }
+# -----------------------------------
+# HEALTH CHECK
+# -----------------------------------
+@app.get("/health")
+def health_check():
+    try:
+        # Ping MongoDB
+        client.admin.command("ping")
+
+        return {
+            "status": "healthy",
+            "mongodb": "connected",
+            "service": "AQI Prediction API",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except PyMongoError as e:
+        return {
+            "status": "unhealthy",
+            "mongodb": "disconnected",
+            "error": str(e),
+            "timestamp": datetime.utcnow().isoformat()
+        }
