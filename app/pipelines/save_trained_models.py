@@ -1,4 +1,4 @@
-from pipelines.train_baseline_model import train_and_return_model
+from app.pipelines.train_baseline_model import train_and_return_model
 
 if __name__ == "__main__":
     for horizon in [1, 6, 24]:
@@ -8,7 +8,7 @@ if __name__ == "__main__":
 
     # pipelines/save_trained_models.py
 
-from pipelines.train_baseline_model import train_and_return_model
+from app.pipelines.train_baseline_model import train_and_return_model
 
 if __name__ == "__main__":
     for horizon in [6, 24]:

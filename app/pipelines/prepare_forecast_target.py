@@ -1,5 +1,5 @@
 import pandas as pd
-from pipelines.final_feature_table import build_final_dataframe
+from app.pipelines.final_feature_table import build_final_dataframe
 
 
 def build_forecasting_dataset(horizon: int = 1):

@@ -10,8 +10,8 @@ from sklearn.metrics import mean_squared_error, r2_score
 from xgboost import XGBRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 
-from pipelines.final_feature_table import build_training_dataset
-from pipelines.register_model import register_model
+from app.pipelines.final_feature_table import build_training_dataset
+from app.pipelines.register_model import register_model
 
 
 def train_ensemble(horizon: int):

@@ -1,5 +1,6 @@
 from datetime import datetime
-from db.mongo import model_registry
+from app.db.mongo import model_registry
+
 
 
 def register_model(

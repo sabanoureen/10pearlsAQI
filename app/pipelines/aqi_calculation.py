@@ -1,5 +1,5 @@
 import pandas as pd
-from pipelines.fetch_karachi_aqi import fetch_karachi_air_quality
+from app.pipelines.fetch_karachi_aqi import fetch_karachi_air_quality
 
 
 def calculate_aqi_pm25(pm25: float) -> int:

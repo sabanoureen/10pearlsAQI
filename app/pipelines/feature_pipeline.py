@@ -18,8 +18,8 @@ sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 )
 
-from pipelines.data_fetcher import fetch_and_store_data
-from pipelines.feature_engineering import run_feature_pipeline
+from app.pipelines.data_fetcher import fetch_and_store_data
+from app.pipelines.feature_engineering import run_feature_pipeline
 
 
 def run_feature_pipeline():

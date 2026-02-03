@@ -14,7 +14,7 @@ sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 )
 
-from pipelines.final_feature_table import build_final_dataframe
+from app.pipelines.final_feature_table import build_final_dataframe
 
 
 def run():

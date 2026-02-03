@@ -1,10 +1,10 @@
 import pandas as pd
 
-from pipelines.fetch_karachi_aqi import fetch_karachi_air_quality
-from pipelines.aqi_calculation import add_aqi_column
-from pipelines.feature_engineering_time import add_time_features
-from pipelines.feature_engineering_lag import add_lag_features
-from pipelines.feature_engineering_rolling import add_rolling_features
+from app.pipelines.fetch_karachi_aqi import fetch_karachi_air_quality
+from app.pipelines.aqi_calculation import add_aqi_column
+from app.pipelines.feature_engineering_time import add_time_features
+from app.pipelines.feature_engineering_lag import add_lag_features
+from app.pipelines.feature_engineering_rolling import add_rolling_features
 
 
 def build_final_dataframe() -> pd.DataFrame:

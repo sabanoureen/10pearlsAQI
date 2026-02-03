@@ -3,15 +3,15 @@ import json
 import joblib
 import numpy as np
 
-from xgboost import XGBRegressor
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 
-from pipelines.final_feature_table import build_training_dataset
-from pipelines.register_model import register_model
+from app.pipelines.final_feature_table import build_training_dataset
+from app.pipelines.register_model import register_model
 
 
-def train_xgboost(horizon: int):
-    print(f"🚀 Training XGBoost | horizon={horizon}")
+def train_gradient_boosting(horizon: int):
+    print(f"🌿 Training Gradient Boosting | horizon={horizon}")
 
     # 1. Load dataset
     X, y = build_training_dataset()
@@ -22,14 +22,11 @@ def train_xgboost(horizon: int):
     y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
 
     # 3. Train model
-    model = XGBRegressor(
+    model = GradientBoostingRegressor(
         n_estimators=300,
-        max_depth=6,
         learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=42,
-        n_jobs=-1
+        max_depth=3,
+        random_state=42
     )
 
     model.fit(X_train, y_train)
@@ -40,7 +37,7 @@ def train_xgboost(horizon: int):
     r2 = r2_score(y_test, y_pred)
 
     # 5. Save model
-    model_dir = Path(f"models/xgb_h{horizon}")
+    model_dir = Path(f"models/gbr_h{horizon}")
     model_dir.mkdir(parents=True, exist_ok=True)
 
     model_path = model_dir / "model.joblib"
@@ -51,7 +48,7 @@ def train_xgboost(horizon: int):
 
     # 6. Register model
     register_model(
-        model_name="xgboost",
+        model_name="gradient_boosting",
         horizon=horizon,
         rmse=rmse,
         r2=r2,
@@ -59,4 +56,5 @@ def train_xgboost(horizon: int):
         features=list(X.columns)
     )
 
-    print(f"✅ XGBoost done | RMSE={rmse:.2f} | R²={r2:.3f}")
+    print(f"✅ Gradient Boosting done | RMSE={rmse:.2f} | R²={r2:.3f}")
+

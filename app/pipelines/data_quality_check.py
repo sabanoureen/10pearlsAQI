@@ -1,6 +1,6 @@
 import pandas as pd
 from fetch_karachi_aqi import fetch_karachi_air_quality
-from pipelines.fetch_karachi_aqi import fetch_karachi_air_quality
+from app.pipelines.fetch_karachi_aqi import fetch_karachi_air_quality
 
 
 def run_quality_checks(df: pd.DataFrame):

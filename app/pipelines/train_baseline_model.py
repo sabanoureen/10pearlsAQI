@@ -3,7 +3,7 @@ import json
 import joblib
 from sklearn.linear_model import Ridge
 
-from pipelines.final_feature_table import build_training_dataset
+from app.pipelines.final_feature_table import build_training_dataset
 
 
 def train_and_return_model(horizon: int):
@@ -33,7 +33,7 @@ def train_and_return_model(horizon: int):
 # ❌ DO NOT TRAIN AT IMPORT TIME
 # ❌ NO model.fit() OUTSIDE FUNCTIONS
 
-from pipelines.register_model import register_model
+from app.pipelines.register_model import register_model
 
 register_model(
     model_name="ridge_regression",

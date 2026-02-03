@@ -1,12 +1,28 @@
-- name: Run training pipeline
-  env:
-    MONGO_URI: ${{ secrets.MONGO_URI }}
-  run: |
-    export PYTHONPATH=$(pwd)
-    python -m app.pipelines.training_pipeline
-  run: |
-    pwd
-    ls
-    ls app
-    export PYTHONPATH=$(pwd)
-    python -m app.pipelines.training_pipeline
+name: Training Pipeline (Daily)
+
+on:
+  schedule:
+    - cron: "0 2 * * *"   # daily at 2 AM UTC
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run training pipeline
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+        run: |
+          export PYTHONPATH=$PWD
+          python -m app.pipelines.training_pipeline

@@ -2,11 +2,24 @@ from fastapi import FastAPI
 from datetime import datetime, timezone
 from typing import List
 
-from pipelines.inference import predict_aqi, predict_multi_aqi
-from db.mongo import feature_store
+from app.pipelines.inference import predict_aqi, predict_multi_aqi
+from app.db.mongo import client
+from pymongo import MongoClient
+
 from pymongo.errors import PyMongoError
-from db.mongo import client
 from pathlib import Path
+
+app = FastAPI(title="AQI Prediction API")
+
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(
+        "api.main:app",
+        host="0.0.0.0",
+        port=port
+    )
+
 
 
 
@@ -158,7 +171,7 @@ def list_models():
     }
 @app.get("/models/best")
 def get_best_model(horizon: int = 1):
-    from db.mongo import model_registry
+    from app.db.mongo import model_registry
 
     model = model_registry.find_one(
         {"horizon": horizon, "is_best": True},
@@ -174,7 +187,7 @@ def get_best_model(horizon: int = 1):
 # -----------------------------------
 @app.get("/models/best")
 def get_best_model(horizon: int = 1):
-    from db.mongo import model_registry
+    from app.db.mongo import model_registry
 
     model = model_registry.find_one(
         {"horizon": horizon, "is_best": True},
