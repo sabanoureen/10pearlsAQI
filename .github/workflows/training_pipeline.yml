@@ -21,7 +21,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run training pipeline
+        working-directory: .
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
-          PYTHONPATH: ${{ github.workspace }}
         run: python -m app.pipelines.training_pipeline
