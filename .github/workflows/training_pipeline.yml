@@ -20,9 +20,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run training pipeline   # 👈 THIS IS THE STEP WE FIXED
+      - name: Run training pipeline
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           PYTHONPATH: ${{ github.workspace }}
-        run: |
-           run: python -m app.pipelines.training_pipeline
+        run: python -m app.pipelines.training_pipeline
