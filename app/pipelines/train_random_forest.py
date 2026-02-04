@@ -4,25 +4,14 @@ import joblib
 import numpy as np
 
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import mean_squared_error, r2_score
 
-from app.pipelines.final_feature_table import build_training_dataset
 from app.pipelines.register_model import register_model
 
 
-def train_random_forest(horizon: int):
-    print(f"🌲 Training Random Forest | horizon={horizon}")
+def train_random_forest(X_train, y_train, X_val, y_val, horizon: int):
+    print("🌲 Training Random Forest")
 
-    # 1. Load dataset
-    X, y = build_training_dataset()
-
-
-    # 2. Time-based split
-    split_idx = int(len(X) * 0.8)
-    X_train, X_test = X.iloc[:split_idx], X.iloc[split_idx:]
-    y_train, y_test = y.iloc[:split_idx], y.iloc[split_idx:]
-
-    # 3. Train model
     model = RandomForestRegressor(
         n_estimators=300,
         min_samples_leaf=2,
@@ -31,32 +20,27 @@ def train_random_forest(horizon: int):
     )
     model.fit(X_train, y_train)
 
-    # 4. Evaluate
-    y_pred = model.predict(X_test)
+    preds = model.predict(X_val)
+    rmse = np.sqrt(mean_squared_error(y_val, preds))
+    r2 = r2_score(y_val, preds)
 
-    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-    
-    r2 = r2_score(y_test, y_pred)
-    
-    # 5. Save model
-    model_dir = Path(f"models/rf_h{horizon}")
+    # Save model
+    model_dir = Path(f"models/random_forest_h{horizon}")
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    model_path = model_dir / "model.joblib"
-    joblib.dump(model, model_path)
+    joblib.dump(model, model_dir / "model.joblib")
+    (model_dir / "features.json").write_text(json.dumps(list(X_train.columns)))
 
-    # Save features
-    feature_path = model_dir / "features.json"
-    feature_path.write_text(json.dumps(list(X.columns)))
-
-    # 6. Register in MongoDB
+    # Register
     register_model(
         model_name="random_forest",
         horizon=horizon,
         rmse=rmse,
         r2=r2,
-        model_path=str(model_path),
-        features=list(X.columns)
+        model_path=str(model_dir / "model.joblib"),
+        features=list(X_train.columns)
     )
 
     print(f"✅ RF done | RMSE={rmse:.2f} | R²={r2:.3f}")
+    return model, {"rmse": rmse, "r2": r2}
+

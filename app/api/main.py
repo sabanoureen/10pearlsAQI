@@ -1,209 +1,60 @@
 from fastapi import FastAPI
 from datetime import datetime, timezone
 from typing import List
-
-from app.pipelines.inference import predict_aqi, predict_multi_aqi
-from app.db.mongo import client
-from pymongo import MongoClient
-
 from pymongo.errors import PyMongoError
-from pathlib import Path
+
+from app.api.routes import router
+from app.pipelines.inference import predict_aqi, predict_multi_aqi
+from app.db.mongo import client, model_registry, feature_store
 
 app = FastAPI(title="AQI Prediction API")
 
+# ----------------------------
+# ROUTERS
+# ----------------------------
+app.include_router(router)
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(
-        "api.main:app",
-        host="0.0.0.0",
-        port=port
-    )
-
-
-
-
-# -----------------------------------
-# FastAPI App
-# -----------------------------------
-app = FastAPI(title="AQI Prediction API")
-
-# -----------------------------------
-# SINGLE AQI PREDICTION
-# -----------------------------------
-@app.get("/predict")
-def predict(city: str = "Karachi", horizon: int = 24):
-    """
-    Predict AQI for a single horizon (hours)
-    """
-    result = predict_aqi(horizon)
-
-    if result["status"] != "success":
-        return {
-            "status": "error",
-            "message": result["message"]
-        }
-
-    return {
-        "status": "ok",
-        "city": city,
-        "horizon_hours": horizon,
-        "predicted_aqi": result["predicted_aqi"],
-        "model": result["model"],
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-
-# -----------------------------------
-# MULTI-HORIZON AQI PREDICTION
-# -----------------------------------
-@app.get("/predict/multi")
-def predict_multi(
-    city: str = "Karachi",
-    horizons: List[int] = [1, 6, 24]
-):
-    """
-    Example:
-    /predict/multi?horizons=1&horizons=6&horizons=24
-    """
-    result = predict_multi_aqi(horizons)
-
-    if result["status"] != "success":
-        return {
-            "status": "error",
-            "message": "Multi-horizon prediction failed"
-        }
-
-    return {
-        **result,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-
-
-# -----------------------------------
-# FEATURE FRESHNESS API
-# -----------------------------------
-@app.get("/features/freshness")
-def feature_freshness(city: str = "Karachi"):
-    """
-    Returns feature store freshness for a city
-    """
-    doc = feature_store.find_one(
-        {"city": city},
-        {"_id": 0, "city": 1, "updated_at": 1}
-    )
-
-    if not doc or "updated_at" not in doc:
-        return {
-            "status": "no_data",
-            "message": f"No feature timestamp found for city={city}"
-        }
-
-    updated_at = doc["updated_at"]
-
-    # Ensure timezone safety
-    if updated_at.tzinfo is None:
-        updated_at = updated_at.replace(tzinfo=timezone.utc)
-
-    now = datetime.now(timezone.utc)
-    age_minutes = round((now - updated_at).total_seconds() / 60, 2)
-
-    return {
-        "status": "ok",
-        "city": city,
-        "updated_at": updated_at.isoformat(),
-        "age_minutes": age_minutes
-    }
-# -----------------------------------
+# ----------------------------
 # HEALTH CHECK
-# -----------------------------------
+# ----------------------------
 @app.get("/health")
-def health_check():
+def health():
     try:
-        # Ping MongoDB
         client.admin.command("ping")
-
         return {
             "status": "healthy",
-            "mongodb": "connected",
-            "service": "AQI Prediction API",
+            "service": "AQI API",
             "timestamp": datetime.utcnow().isoformat()
         }
-
     except PyMongoError as e:
         return {
             "status": "unhealthy",
-            "mongodb": "disconnected",
-            "error": str(e),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-# -----------------------------------
-# MODEL LISTING
-# -----------------------------------
-@app.get("/models")
-def list_models():
-    models_dir = Path("models")
-
-    models = []
-
-    if not models_dir.exists():
-        return {
-            "count": 0,
-            "models": [],
-            "message": "No models directory found"
+            "error": str(e)
         }
 
-    for path in models_dir.glob("ridge_h*"):
-        try:
-            horizon = int(path.name.replace("ridge_h", ""))
-        except ValueError:
-            continue
+# ----------------------------
+# SINGLE PREDICTION
+# ----------------------------
+@app.get("/predict")
+def predict(horizon: int = 1, version: str | None = None):
+    return predict_aqi(horizon, version)
 
-        models.append({
-            "model": "ridge_regression",
-            "horizon_hours": horizon,
-            "path": str(path)
-        })
+# ----------------------------
+# MULTI PREDICTION
+# ----------------------------
+@app.get("/predict/multi")
+def predict_multi(horizons: List[int]):
+    return predict_multi_aqi(horizons)
 
-    return {
-        "count": len(models),
-        "models": sorted(models, key=lambda x: x["horizon_hours"])
-    }
+# ----------------------------
+# BEST MODEL
+# ----------------------------
 @app.get("/models/best")
-def get_best_model(horizon: int = 1):
-    from app.db.mongo import model_registry
-
+def best_model(horizon: int = 1):
     model = model_registry.find_one(
         {"horizon": horizon, "is_best": True},
         {"_id": 0}
     )
-
     if not model:
         return {"status": "not_found"}
-
-    return {"status": "ok", "model": model}
-# -----------------------------------
-# BEST MODEL INFO
-# -----------------------------------
-@app.get("/models/best")
-def get_best_model(horizon: int = 1):
-    from app.db.mongo import model_registry
-
-    model = model_registry.find_one(
-        {"horizon": horizon, "is_best": True},
-        {"_id": 0}
-    )
-
-    if not model:
-        return {
-            "status": "not_found",
-            "message": "No best model found"
-        }
-
-    return {
-        "status": "ok",
-        "best_model": model
-    }
-@app.get("/predict")
-def predict(horizon: int = 24, version: str | None = None):
-    return predict_aqi(horizon, version)
+    return {"status": "ok", "best_model": model}

@@ -14,14 +14,15 @@ st.set_page_config(
 
 API_BASE_URL = st.secrets.get(
     "API_BASE_URL",
-    "http://localhost:8000"  # local fallback
+    "http://localhost:8000"
 )
 
-REQUEST_TIMEOUT = 5  # seconds
+REQUEST_TIMEOUT = 45  # increased for Railway cold starts
+
 
 
 # -----------------------------------
-# Helper functions
+# Helpers
 # -----------------------------------
 def safe_get(url, params=None):
     try:
@@ -33,26 +34,14 @@ def safe_get(url, params=None):
         return None
 
 
-def fetch_best_model(horizon: int):
-    return safe_get(
-        f"{API_BASE_URL}/models/best",
-        params={"horizon": horizon}
-    )
-
-
-def fetch_prediction(horizon: int):
-    return safe_get(
-        f"{API_BASE_URL}/predict",
-        params={"horizon": horizon}
-    )
-
-
-def fetch_multi_prediction(horizons):
-    params = [("horizons", h) for h in horizons]
-    return safe_get(
-        f"{API_BASE_URL}/predict/multi",
-        params=params
-    )
+def safe_post(url, payload):
+    try:
+        r = requests.post(url, json=payload, timeout=REQUEST_TIMEOUT)
+        r.raise_for_status()
+        return r.json()
+    except Exception as e:
+        st.error(f"API error: {e}")
+        return None
 
 
 # -----------------------------------
@@ -75,26 +64,27 @@ if st.sidebar.button("🔄 Refresh"):
 # Header
 # -----------------------------------
 st.title("🌍 AQI Forecast Dashboard")
-st.caption("Real-time AQI predictions powered by ML")
+st.caption("Real-time AQI predictions powered by ML Ensemble Models")
 
 
 # -----------------------------------
-# Best model info
+# Best model (MongoDB)
 # -----------------------------------
-st.subheader("🏆 Best Model (Horizon = 1h)")
+st.subheader("🏆 Best Production Model (1h)")
 
-best_model = fetch_best_model(horizon=1)
+best_model = safe_get(
+    f"{API_BASE_URL}/models/best",
+    params={"horizon": 1}
+)
 
-if best_model and best_model.get("status") == "ok":
-    model = best_model["best_model"]
-    st.success("Best model loaded")
-
+if best_model and best_model.get("status") == "success":
+    model = best_model["model"]
     col1, col2, col3 = st.columns(3)
     col1.metric("Model", model["model_name"])
     col2.metric("RMSE", round(model["rmse"], 2))
     col3.metric("R²", round(model["r2"], 3))
 else:
-    st.warning("No best model available")
+    st.warning("No production model found")
 
 
 # -----------------------------------
@@ -102,12 +92,18 @@ else:
 # -----------------------------------
 st.subheader("📈 Current AQI Prediction")
 
-prediction = fetch_prediction(horizon=1)
+prediction = safe_get(
+    f"{API_BASE_URL}/predict",
+    params={"horizon": 1}
+)
 
-if prediction and prediction.get("status") == "ok":
+if prediction and prediction.get("status") == "success":
     st.metric(
         label="Predicted AQI (1h)",
-        value=prediction["predicted_aqi"]
+        value=round(prediction["predicted_aqi"], 2)
+    )
+    st.caption(
+        f"Model: **{prediction['model_name']}** | Version: `{prediction.get('version','legacy')}`"
     )
 else:
     st.warning("Prediction unavailable")
@@ -116,22 +112,23 @@ else:
 # -----------------------------------
 # Multi-day forecast
 # -----------------------------------
-st.subheader("📊 Multi-day Forecast")
+st.subheader("📊 Multi-day AQI Forecast")
 
 horizons = [h * 24 for h in range(1, forecast_days + 1)]
-multi = fetch_multi_prediction(horizons)
+
+multi = safe_post(
+    f"{API_BASE_URL}/predict/multi",
+    payload={"horizons": horizons}
+)
 
 if multi and multi.get("status") == "success":
-    data = []
+    rows = []
     for k, v in multi["predictions"].items():
         if isinstance(v, dict):
             continue
-        data.append({
-            "Horizon": k,
-            "AQI": v
-        })
+        rows.append({"Horizon": k, "AQI": v})
 
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(rows)
 
     fig = px.line(
         df,

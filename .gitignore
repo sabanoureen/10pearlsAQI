@@ -21,3 +21,5 @@ db/
 # Environment files
 .env
 .env.*
+!app/db/
+!app/db/**

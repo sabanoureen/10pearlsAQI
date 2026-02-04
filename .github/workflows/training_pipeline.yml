@@ -23,6 +23,6 @@ jobs:
       - name: Run training pipeline
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
+          PYTHONPATH: ${{ github.workspace }}
         run: |
-          export PYTHONPATH=$PWD
           python -m app.pipelines.training_pipeline
