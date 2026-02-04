@@ -17,7 +17,8 @@ API_BASE_URL = st.secrets.get(
     "http://localhost:8000"
 )
 
-REQUEST_TIMEOUT = 45  # increased for Railway cold starts
+requests.get(url, timeout=(5, 30))  # connect, read
+
 
 
 
