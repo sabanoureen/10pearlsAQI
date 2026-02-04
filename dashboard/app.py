@@ -12,12 +12,20 @@ st.set_page_config(
     layout="wide"
 )
 
+import requests
+import streamlit as st
+
 API_BASE_URL = st.secrets.get(
     "API_BASE_URL",
-    "http://localhost:8000"
+    "https://10pearlsaqi-production-05e8.up.railway.app"
 )
 
-requests.get(url, timeout=(5, 30))  # connect, read
+REQUEST_TIMEOUT = 30
+
+url = f"{API_BASE_URL}/models/best?horizon=1"
+
+response = requests.get(url, timeout=REQUEST_TIMEOUT)
+
 
 
 
