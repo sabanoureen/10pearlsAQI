@@ -1,4 +1,5 @@
-from db.mongo import model_registry
+from app.db.mongo import model_registry
+
 
 
 def select_best_model(horizon: int):
@@ -6,32 +7,31 @@ def select_best_model(horizon: int):
 
     models = list(
         model_registry.find(
-            {
-                "horizon": horizon,
-                "rmse": {"$exists": True}
-            }
+            {"horizon": horizon},
+            {"_id": 1, "rmse": 1, "model_name": 1}
         )
     )
 
     if not models:
-        raise RuntimeError(f"No models with RMSE found for horizon={horizon}")
+        raise RuntimeError(f"No models found for horizon={horizon}")
 
-    # Pick model with lowest RMSE
-    best = min(models, key=lambda x: x["rmse"])
+    best_model = min(models, key=lambda m: m["rmse"])
 
-    # Reset all models for this horizon
+    # demote all
     model_registry.update_many(
         {"horizon": horizon},
-        {"$set": {"is_best": False}}
+        {"$set": {"is_best": False, "status": "archived"}}
     )
 
-    # Mark best model
+    # promote best
     model_registry.update_one(
-        {"_id": best["_id"]},
-        {"$set": {"is_best": True}}
+        {"_id": best_model["_id"]},
+        {"$set": {"is_best": True, "status": "production"}}
     )
 
     print(
-        f"✅ Best model selected: {best['model_name']} "
-        f"(RMSE={best['rmse']:.2f})"
+        f"✅ Best model selected: {best_model['model_name']} "
+        f"(RMSE={best_model['rmse']:.2f})"
     )
+
+    return best_model
