@@ -2,27 +2,12 @@
 Training Pipeline
 -----------------
 - Trains all ML models
-- Evaluates them using RMSE / R²
 - Registers models in MongoDB
 - Selects best model automatically
-
-Single authoritative entry point for training.
 """
 
-import sys
-import os
-
-# Ensure project root is on PYTHONPATH
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
-
-# -----------------------------------
-# Ensure project root is on PYTHONPATH
-# -----------------------------------
-sys.path.append(
-    os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-)
+from datetime import datetime
+import uuid
 
 from app.pipelines.train_random_forest import train_random_forest
 from app.pipelines.train_xgboost import train_xgboost
@@ -31,29 +16,64 @@ from app.pipelines.train_ensemble import train_ensemble
 from app.pipelines.select_best_model import select_best_model
 
 
+run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
+print(f"🆔 Training run_id = {run_id}")
+
+
 def run_training_pipeline(horizon: int = 1):
     print("🚀 Starting training pipeline")
     print(f"📌 Forecast horizon: {horizon} hour(s)\n")
 
     # -----------------------------
-    # Train individual models
+    # 1️⃣ Build dataset
     # -----------------------------
-    train_random_forest(horizon)
-    train_xgboost(horizon)
-    train_gradient_boosting(horizon)
+    X, y = build_training_dataset()
+
+    if X.empty or y.empty:
+        raise RuntimeError("Training dataset is empty")
 
     # -----------------------------
-    # Train ensemble
+    # 2️⃣ Time-based split
     # -----------------------------
-    train_ensemble(horizon)
+    split_idx = int(len(X) * 0.8)
+
+    X_train = X.iloc[:split_idx]
+    X_val   = X.iloc[split_idx:]
+    y_train = y.iloc[:split_idx]
+    y_val   = y.iloc[split_idx:]
 
     # -----------------------------
-    # Select best model
+    # 3️⃣ Train base models
+    # -----------------------------
+    rf_model, rf_metrics = train_random_forest(
+        X_train, y_train, X_val, y_val, horizon
+    )
+
+    xgb_model, xgb_metrics = train_xgboost(
+        X_train, y_train, X_val, y_val, horizon
+    )
+
+    gb_model, gb_metrics = train_gradient_boosting(
+        X_train, y_train, X_val, y_val, horizon
+    )
+
+    # -----------------------------
+    # 4️⃣ Train ensemble
+    # -----------------------------
+    ensemble_model, ensemble_metrics = train_ensemble(
+        rf_model=rf_model,
+        xgb_model=xgb_model,
+        gb_model=gb_model,
+        X_train=X_train,
+        y_train=y_train,
+        X_val=X_val,
+        y_val=y_val,
+        horizon=horizon,
+    )
+
+    # -----------------------------
+    # 5️⃣ Select best model
     # -----------------------------
     select_best_model(horizon)
 
     print("\n✅ Training pipeline completed successfully")
-
-
-if __name__ == "__main__":
-    run_training_pipeline(horizon=1)
