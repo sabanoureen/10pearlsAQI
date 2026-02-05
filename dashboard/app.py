@@ -143,10 +143,14 @@ else:
 # -------------------------------
 # Footer
 # -------------------------------
-st.divider()
-st.caption(f"Last updated: {datetime.utcnow().isoformat()} UTC")
 
 @app.get("/")
 def root():
     return {"status": "ok", "service": "AQI API"}
+# -------------------------------
+# Footer
+# -------------------------------
+st.divider()
+st.caption(f"Last updated: {datetime.utcnow().isoformat()} UTC")
+
 
