@@ -8,43 +8,40 @@ if not MONGO_URI:
 
 client = MongoClient(
     MONGO_URI,
-    serverSelectionTimeoutMS=5000,
-    connectTimeoutMS=5000,
-    socketTimeoutMS=5000,
+    serverSelectionTimeoutMS=3000,
+    connectTimeoutMS=3000,
+    socketTimeoutMS=3000,
 )
 
 db = client["aqi_system"]
 
-feature_store = db["feature_store"]
-model_registry = db["model_registry"]
+# Collections
+_feature_store = db["feature_store"]
+_model_registry = db["model_registry"]
 
-# -----------------------------
-# Getters (THIS FIXES THE CRASH)
-# -----------------------------
+# -------- Accessors --------
 def get_feature_store():
-    return feature_store
+    return _feature_store
 
 def get_model_registry():
-    return model_registry
+    return _model_registry
 
-# -----------------------------
-# Feature helpers
-# -----------------------------
+# -------- Helpers ----------
 def upsert_features(city: str, features: dict):
-    feature_store.update_one(
+    _feature_store.update_one(
         {"city": city},
         {
             "$set": {
                 "city": city,
                 "features": features,
-                "updated_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
             }
         },
-        upsert=True,
+        upsert=True
     )
 
 def get_feature_freshness(city: str):
-    return feature_store.find_one(
+    return _feature_store.find_one(
         {"city": city},
-        {"_id": 0, "city": 1, "updated_at": 1},
+        {"_id": 0, "city": 1, "updated_at": 1}
     )

@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from datetime import datetime
+from datetime import datetime, timezone
 from pymongo.errors import PyMongoError
 
 from app.db.mongo import get_model_registry, get_feature_store
