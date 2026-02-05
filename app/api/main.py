@@ -24,13 +24,9 @@ class MultiPredictRequest(BaseModel):
 def health():
     try:
         get_model_registry().find_one()
-        return {
-            "status": "ok",
-            "time": datetime.utcnow().isoformat()
-        }
-    except PyMongoError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        return {"status": "ok"}
+    except Exception as e:
+        return {"error": str(e)}
 
 # -------------------
 # BEST MODEL
