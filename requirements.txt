@@ -11,3 +11,4 @@ pymongo[srv]
 xgboost
 xgboost==2.0.3
 lightgbm==4.3.0
+plotly
