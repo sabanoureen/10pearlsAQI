@@ -2,6 +2,10 @@ import streamlit as st
 import requests
 import pandas as pd
 import plotly.express as px
+import streamlit as st
+st.title("🔥 Streamlit is running")
+st.write("If you see this, the app loaded correctly")
+
 
 # -------------------------------
 # Config

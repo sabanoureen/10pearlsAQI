@@ -11,17 +11,20 @@ def get_db():
     if _db:
         return _db
 
-    mongo_uri = os.getenv("MONGODB_URI")
-    if not mongo_uri:
-        raise RuntimeError("MONGODB_URI not set")
+MONGO_URI = os.getenv("MONGODB_URI")
 
-    _client = MongoClient(
-        mongo_uri,
-        serverSelectionTimeoutMS=5000,
-    )
+if not MONGO_URI:
+    raise RuntimeError("MONGODB_URI not set")
 
-    _db = _client["aqi_system"]
-    return _db
+client = MongoClient(
+    MONGO_URI,
+    serverSelectionTimeoutMS=3000,
+    connectTimeoutMS=3000,
+    socketTimeoutMS=3000,
+)
+
+_db = client["aqi_system"]
+
 
 
 def get_feature_store():
