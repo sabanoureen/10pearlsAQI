@@ -1,52 +1,38 @@
-# -------------------------------
-# Best Production Model
-# -------------------------------
-st.subheader("🏆 Best Production Model (1h horizon)")
-
-best_model = safe_get("/models/best", params={"horizon": 1})
-
-if best_model:
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Model", best_model["model_name"])
-    c2.metric("RMSE", round(best_model["rmse"], 2))
-    c3.metric("R²", round(best_model["r2"], 3))
-else:
-    st.warning("No production model found")
-
+import streamlit as st
+import requests
+import pandas as pd
+import plotly.express as px
 
 # -------------------------------
-# Current AQI Prediction
+# Config
 # -------------------------------
-st.subheader("📈 Current AQI Prediction (1h)")
+API_BASE_URL = "https://10pearlsaqi-production-848d.up.railway.app"
+forecast_days = 5  # ← you were missing this
 
-prediction = safe_get("/predict", params={"horizon": 1})
-
-if prediction:
-    st.metric("Predicted AQI", round(prediction["predicted_aqi"], 2))
-    st.caption(
-        f"Model: **{prediction['model_name']}** | "
-        f"Version: `{prediction.get('version','legacy')}`"
-    )
-else:
-    st.warning("Prediction unavailable")
-
+st.set_page_config(page_title="AQI Dashboard", layout="wide")
 
 # -------------------------------
-# Multi-day Forecast
+# Safe API helpers
 # -------------------------------
-st.subheader("📊 Multi-day AQI Forecast")
+def safe_get(path, params=None):
+    try:
+        r = requests.get(f"{API_BASE_URL}{path}", params=params, timeout=10)
+        if r.status_code == 200:
+            return r.json()
+    except Exception as e:
+        st.error(f"GET {path} failed: {e}")
+    return None
 
-horizons = [h * 24 for h in range(1, forecast_days + 1)]
 
-multi = safe_post("/predict/multi", {"horizons": horizons})
-
-if multi:
-    df = pd.DataFrame([
-        {"Horizon (hrs)": h, "AQI": v}
-        for h, v in zip(horizons, multi["predictions"])
-    ])
-
-    fig = px.line(df, x="Horizon (hrs)", y="AQI", markers=True)
-    st.plotly_chart(fig, use_container_width=True)
-else:
-    st.warning("Multi-day forecast unavailable")
+def safe_post(path, payload):
+    try:
+        r = requests.post(
+            f"{API_BASE_URL}{path}",
+            json=payload,
+            timeout=10,
+        )
+        if r.status_code == 200:
+            return r.json()
+    except Exception as e:
+        st.error(f"POST {path} failed: {e}")
+    return None
