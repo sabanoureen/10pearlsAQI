@@ -1,70 +1,105 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from datetime import datetime, timezone
 from typing import List
 
 from pymongo.errors import PyMongoError
 
+from app.db.mongo import get_model_registry, get_feature_store
 from app.pipelines.inference import predict_aqi, predict_multi_aqi
-from app.db.mongo import client, model_registry
 
 app = FastAPI(title="AQI Prediction API")
 
-# -----------------------------------
+# -------------------------------------------------
 # HEALTH CHECK
-# -----------------------------------
+# -------------------------------------------------
 @app.get("/health")
-def health_check():
-    try:
-        client.admin.command("ping")
-        return {
-            "status": "healthy",
-            "mongodb": "connected",
-            "service": "AQI Prediction API",
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    except PyMongoError as e:
-        return {
-            "status": "unhealthy",
-            "error": str(e)
-        }
-
-# -----------------------------------
-# SINGLE AQI PREDICTION
-# -----------------------------------
-@app.get("/predict")
-def predict(horizon: int = 1):
-    result = predict_aqi(horizon)
-
-    if result["status"] != "success":
-        return result
-
+def health():
     return {
-        "status": "success",
-        "horizon_hours": horizon,
-        "predicted_aqi": result["predicted_aqi"],
-        "model_name": result["model_name"],
-        "version": result.get("version"),
-        "timestamp": datetime.utcnow().isoformat()
+        "status": "ok",
+        "timestamp": datetime.now(timezone.utc)
     }
 
-# -----------------------------------
-# MULTI-HORIZON PREDICTION
-# -----------------------------------
-@app.get("/predict/multi")
-def predict_multi(horizons: List[int]):
-    return predict_multi_aqi(horizons)
 
-# -----------------------------------
-# BEST MODEL
-# -----------------------------------
+# -------------------------------------------------
+# GET BEST MODEL
+# -------------------------------------------------
 @app.get("/models/best")
 def get_best_model(horizon: int = 1):
-    model = model_registry.find_one(
-        {"horizon": horizon, "is_best": True},
-        {"_id": 0}
-    )
+    try:
+        registry = get_model_registry()
 
-    if not model:
-        return {"status": "not_found"}
+        model = registry.find_one(
+            {"horizon": horizon},
+            sort=[("rmse", 1)]
+        )
 
-    return {"status": "ok", "best_model": model}
+        if not model:
+            return {"message": "No production model found"}
+
+        model["_id"] = str(model["_id"])
+        return model
+
+    except PyMongoError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------------------------------------------------
+# SINGLE AQI PREDICTION
+# -------------------------------------------------
+@app.get("/predict")
+def predict(horizon: int = 1):
+    try:
+        registry = get_model_registry()
+        feature_store = get_feature_store()
+
+        model = registry.find_one(
+            {"horizon": horizon},
+            sort=[("rmse", 1)]
+        )
+
+        if not model:
+            raise HTTPException(status_code=404, detail="No model available")
+
+        result = predict_aqi(
+            horizon=horizon,
+            model_doc=model,
+            feature_store=feature_store
+        )
+
+        return result
+
+    except PyMongoError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# -------------------------------------------------
+# MULTI AQI PREDICTION
+# -------------------------------------------------
+@app.post("/predict/multi")
+def predict_multi(horizons: List[int]):
+    try:
+        registry = get_model_registry()
+        feature_store = get_feature_store()
+
+        results = {}
+
+        for h in horizons:
+            model = registry.find_one(
+                {"horizon": h},
+                sort=[("rmse", 1)]
+            )
+
+            if not model:
+                results[h] = {"error": "No model found"}
+                continue
+
+            results[h] = predict_multi_aqi(
+                horizon=h,
+                model_doc=model,
+                feature_store=feature_store
+            )
+
+        return results
+
+    except PyMongoError as e:
+        raise HTTPException(status_code=500, detail=str(e))
