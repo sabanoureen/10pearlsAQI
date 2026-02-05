@@ -55,4 +55,8 @@ def upsert_features(city: str, features: dict):
             "$set": {
                 "city": city,
                 "features": features,
-                "updated_at": dateti_
+                "updated_at": datetime.utcnow(),
+            }
+        },
+        upsert=True,
+    )
