@@ -1,6 +1,5 @@
 from pymongo import MongoClient
 import os
-from datetime import datetime
 
 MONGO_URI = os.getenv("MONGO_URI")
 if not MONGO_URI:
@@ -15,33 +14,15 @@ client = MongoClient(
 
 db = client["aqi_system"]
 
-# Collections
+# collections
 _feature_store = db["feature_store"]
 _model_registry = db["model_registry"]
 
-# -------- Accessors --------
+# -----------------------
+# getters (IMPORTANT)
+# -----------------------
 def get_feature_store():
     return _feature_store
 
 def get_model_registry():
     return _model_registry
-
-# -------- Helpers ----------
-def upsert_features(city: str, features: dict):
-    _feature_store.update_one(
-        {"city": city},
-        {
-            "$set": {
-                "city": city,
-                "features": features,
-                "updated_at": datetime.utcnow()
-            }
-        },
-        upsert=True
-    )
-
-def get_feature_freshness(city: str):
-    return _feature_store.find_one(
-        {"city": city},
-        {"_id": 0, "city": 1, "updated_at": 1}
-    )
