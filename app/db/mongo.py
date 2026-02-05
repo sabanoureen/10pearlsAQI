@@ -1,42 +1,32 @@
 import os
-from datetime import datetime
 from pymongo import MongoClient
-from pymongo.errors import PyMongoError
+from datetime import datetime
 
-# -----------------------------
-# MongoDB connection
-# -----------------------------
-
-MONGODB_URI = os.getenv("MONGODB_URI")
-
-if not MONGODB_URI:
-    raise RuntimeError("MONGODB_URI not set")
-
-_client = MongoClient(
-    MONGODB_URI,
-    serverSelectionTimeoutMS=3000,
-    connectTimeoutMS=3000,
-    socketTimeoutMS=3000,
-)
-
-_db = _client["aqi_system"]
+_client = None
+_db = None
 
 
-# -----------------------------
-# DB getter
-# -----------------------------
 def get_db():
-    try:
-        # Force connection check
-        _client.admin.command("ping")
+    global _client, _db
+
+    if _db is not None:
         return _db
-    except PyMongoError as e:
-        raise RuntimeError(f"MongoDB connection failed: {e}")
+
+    mongo_uri = os.getenv("MONGODB_URI")
+    if not mongo_uri:
+        raise RuntimeError("MONGODB_URI not set")
+
+    _client = MongoClient(
+        mongo_uri,
+        serverSelectionTimeoutMS=3000,
+        connectTimeoutMS=3000,
+        socketTimeoutMS=3000,
+    )
+
+    _db = _client["aqi_system"]
+    return _db
 
 
-# -----------------------------
-# Collection getters
-# -----------------------------
 def get_feature_store():
     return get_db()["feature_store"]
 
@@ -45,9 +35,6 @@ def get_model_registry():
     return get_db()["model_registry"]
 
 
-# -----------------------------
-# Feature upsert helper
-# -----------------------------
 def upsert_features(city: str, features: dict):
     get_feature_store().update_one(
         {"city": city},
