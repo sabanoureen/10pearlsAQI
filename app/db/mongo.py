@@ -2,27 +2,39 @@ from pymongo import MongoClient
 import os
 from datetime import datetime
 
-MONGO_URI = os.getenv("MONGO_URI")
-if not MONGO_URI:
-    raise RuntimeError("MONGO_URI not set")
+_client = None
+_db = None
 
-_client = MongoClient(
-    MONGO_URI,
-    serverSelectionTimeoutMS=3000,
-    connectTimeoutMS=3000,
-    socketTimeoutMS=3000,
-)
 
-_db = _client["aqi_system"]
+def get_db():
+    global _client, _db
+
+    if _db is None:
+        mongo_uri = os.getenv("MONGO_URI")
+        if not mongo_uri:
+            raise RuntimeError("MONGO_URI not set")
+
+        _client = MongoClient(
+            mongo_uri,
+            serverSelectionTimeoutMS=3000,
+            connectTimeoutMS=3000,
+            socketTimeoutMS=3000,
+        )
+        _db = _client["aqi_system"]
+
+    return _db
+
 
 # -----------------------------
 # Collection getters
 # -----------------------------
 def get_feature_store():
-    return _db["feature_store"]
+    return get_db()["feature_store"]
+
 
 def get_model_registry():
-    return _db["model_registry"]
+    return get_db()["model_registry"]
+
 
 # -----------------------------
 # Feature upsert helper
@@ -34,8 +46,8 @@ def upsert_features(city: str, features: dict):
             "$set": {
                 "city": city,
                 "features": features,
-                "updated_at": datetime.utcnow()
+                "updated_at": datetime.utcnow(),
             }
         },
-        upsert=True
+        upsert=True,
     )
