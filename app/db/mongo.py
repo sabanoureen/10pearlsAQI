@@ -1,28 +1,37 @@
-from pymongo import MongoClient
 import os
 from datetime import datetime
+from pymongo import MongoClient
+from pymongo.errors import PyMongoError
 
-_client = None
-_db = None
+# -----------------------------
+# MongoDB connection
+# -----------------------------
+
+MONGODB_URI = os.getenv("MONGODB_URI")
+
+if not MONGODB_URI:
+    raise RuntimeError("MONGODB_URI not set")
+
+_client = MongoClient(
+    MONGODB_URI,
+    serverSelectionTimeoutMS=3000,
+    connectTimeoutMS=3000,
+    socketTimeoutMS=3000,
+)
+
+_db = _client["aqi_system"]
 
 
+# -----------------------------
+# DB getter
+# -----------------------------
 def get_db():
-    global _client, _db
-
-    if _db is None:
-        mongo_uri = os.getenv("MONGO_URI")
-        if not mongo_uri:
-            raise RuntimeError("MONGO_URI not set")
-
-        _client = MongoClient(
-            mongo_uri,
-            serverSelectionTimeoutMS=3000,
-            connectTimeoutMS=3000,
-            socketTimeoutMS=3000,
-        )
-        _db = _client["aqi_system"]
-
-    return _db
+    try:
+        # Force connection check
+        _client.admin.command("ping")
+        return _db
+    except PyMongoError as e:
+        raise RuntimeError(f"MongoDB connection failed: {e}")
 
 
 # -----------------------------
@@ -46,8 +55,4 @@ def upsert_features(city: str, features: dict):
             "$set": {
                 "city": city,
                 "features": features,
-                "updated_at": datetime.utcnow(),
-            }
-        },
-        upsert=True,
-    )
+                "updated_at": dateti_
