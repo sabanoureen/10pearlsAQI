@@ -25,7 +25,7 @@ def health():
     try:
         get_model_registry().find_one()
         return {
-            "status": "success",
+            "status": "ok",
             "time": datetime.utcnow().isoformat()
         }
     except PyMongoError as e:
