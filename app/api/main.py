@@ -8,6 +8,10 @@ from app.db.mongo import get_model_registry
 from app.pipelines.inference import predict_aqi, predict_multi_aqi
 
 app = FastAPI(title="AQI Prediction API")
+@app.get("/")
+def root():
+    return {"message": "AQI API is running"}
+
 
 
 # -------------------
