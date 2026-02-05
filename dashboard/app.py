@@ -79,7 +79,10 @@ st.caption("Production AQI predictions powered by ML ensemble models")
 # -------------------------------
 st.subheader("🏆 Best Production Model (1h horizon)")
 
-best_model = safe_get("/models/best", params={"horizon": 1})
+best_model = safe_get(
+    "/api/models/best",
+    params={"horizon": 1}
+)
 
 if best_model and best_model.get("status") == "success":
     model = best_model["model"]
@@ -96,7 +99,10 @@ else:
 # -------------------------------
 st.subheader("📈 Current AQI Prediction (1h)")
 
-prediction = safe_get("/predict", params={"horizon": 1})
+prediction = safe_get(
+    "/api/predict",
+    params={"horizon": 1}
+)
 
 if prediction and prediction.get("status") == "success":
     st.metric(
@@ -118,7 +124,10 @@ st.subheader("📊 Multi-day AQI Forecast")
 
 horizons = [h * 24 for h in range(1, forecast_days + 1)]
 
-multi = safe_post("/predict/multi", {"horizons": horizons})
+multi = safe_post(
+    "/api/predict/multi",
+    {"horizons": horizons}
+)
 
 if multi and multi.get("status") == "success":
     df = pd.DataFrame([
@@ -143,14 +152,5 @@ else:
 # -------------------------------
 # Footer
 # -------------------------------
-
-@app.get("/")
-def root():
-    return {"status": "ok", "service": "AQI API"}
-# -------------------------------
-# Footer
-# -------------------------------
 st.divider()
 st.caption(f"Last updated: {datetime.utcnow().isoformat()} UTC")
-
-
