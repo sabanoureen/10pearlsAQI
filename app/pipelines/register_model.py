@@ -1,5 +1,6 @@
 from datetime import datetime
-from app.db.mongo import model_registry
+from app.db.mongo import get_model_registry
+
 
 
 def register_model(
@@ -19,7 +20,8 @@ def register_model(
     )
 
     # 2️⃣ Insert new versioned model
-    model_registry.insert_one({
+    get_model_registry().insert_one(doc)
+    ({
         "model_name": model_name,
         "horizon": horizon,
         "version": version,              # ✅ IMPORTANT
