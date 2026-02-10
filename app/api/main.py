@@ -1,6 +1,5 @@
 from fastapi import FastAPI, HTTPException
 from datetime import datetime
-from pymongo.errors import PyMongoError
 from pydantic import BaseModel
 from typing import List
 
@@ -8,22 +7,17 @@ from app.db.mongo import get_model_registry
 from app.pipelines.inference import predict_aqi, predict_multi_aqi
 
 app = FastAPI(title="AQI Prediction API")
+
+
 @app.get("/")
 def root():
     return {"message": "AQI API is running"}
 
 
-
-# -------------------
-# SCHEMAS
-# -------------------
 class MultiPredictRequest(BaseModel):
     horizons: List[int]
 
 
-# -------------------
-# HEALTH
-# -------------------
 @app.get("/health")
 def health():
     return {
@@ -33,19 +27,15 @@ def health():
     }
 
 
-# -------------------
-# BEST MODEL
-# -------------------
 @app.get("/models/best")
 def best_model(horizon: int = 1):
     model = get_model_registry().find_one(
-        {"horizon": horizon},
-        sort=[("rmse", 1)]
+        {"horizon": horizon, "is_best": True},
+        {"_id": 0}
     )
+
     if not model:
         raise HTTPException(status_code=404, detail="No production model found")
-
-    model["_id"] = str(model["_id"])
 
     return {
         "status": "success",
@@ -53,25 +43,11 @@ def best_model(horizon: int = 1):
     }
 
 
-# -------------------
-# SINGLE PREDICT
-# -------------------
 @app.get("/predict")
 def predict(horizon: int = 1):
-    result = predict_aqi(horizon)
-    return {
-        "status": "success",
-        **result
-    }
+    return predict_aqi(horizon)
 
 
-# -------------------
-# MULTI PREDICT
-# -------------------
 @app.post("/predict/multi")
 def predict_multi(payload: MultiPredictRequest):
-    predictions = predict_multi_aqi(payload.horizons)
-    return {
-        "status": "success",
-        "predictions": predictions
-    }
+    return predict_multi_aqi(payload.horizons)
