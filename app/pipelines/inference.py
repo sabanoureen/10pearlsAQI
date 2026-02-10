@@ -2,7 +2,8 @@ from pathlib import Path
 import joblib
 from typing import List
 
-from app.db.mongo import model_registry, upsert_features
+from app.db.mongo import get_model_registry, upsert_features
+
 from app.pipelines.final_feature_table import build_final_dataframe
 from app.pipelines.horizon_feature_filter import filter_features_for_horizon
 
@@ -11,6 +12,8 @@ from app.pipelines.horizon_feature_filter import filter_features_for_horizon
 # Load production model from MongoDB
 # -------------------------------------------------
 def _load_production_model(horizon: int):
+    model_registry = get_model_registry()
+
     model_doc = model_registry.find_one(
         {"horizon": horizon, "is_best": True}
     )
