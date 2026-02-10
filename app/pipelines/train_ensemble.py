@@ -24,8 +24,8 @@ def train_ensemble(
     y_train,
     X_val,
     y_val,
-    horizon,
-    run_id : int
+    horizon: int,
+    run_id: str,
 ):
     model = SimpleEnsemble([rf_model, xgb_model, gb_model])
 

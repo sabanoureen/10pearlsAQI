@@ -8,7 +8,7 @@ from sklearn.metrics import mean_squared_error
 from app.db.mongo import get_model_registry
 
 
-def train_gradient_boosting(X_train, y_train, X_val, y_val, horizon, run_id : int):
+def train_gradient_boosting(X_train, y_train, X_val, y_val, horizon: int, run_id: str):
     model = GradientBoostingRegressor(
         n_estimators=300,
         learning_rate=0.05,
