@@ -1,10 +1,8 @@
 from pathlib import Path
-import json
 import joblib
 from typing import List
 
-from app.db.mongo import get_model_registry, upsert_features
-
+from app.db.mongo import model_registry, upsert_features
 from app.pipelines.final_feature_table import build_final_dataframe
 from app.pipelines.horizon_feature_filter import filter_features_for_horizon
 
@@ -66,7 +64,7 @@ def predict_aqi(horizon: int):
             "predicted_aqi": round(pred, 2),
             "horizon_hours": horizon,
             "model_name": model_doc["model_name"],
-            "version": model_doc.get("version", "legacy"),   # ✅ NOW CORRECT
+            "version": model_doc.get("version", "legacy"),
         }
 
     except Exception as e:
