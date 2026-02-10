@@ -16,9 +16,12 @@ def get_db():
     if not MONGODB_URI:
         raise RuntimeError("MONGODB_URI not set")
 
+    MONGODB_URI = MONGODB_URI.strip()  # 🔥 CRITICAL FIX
+
     _client = MongoClient(MONGODB_URI)
     _db = _client["aqi_system"]
     return _db
+
 
 
 def get_feature_store():
