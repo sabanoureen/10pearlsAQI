@@ -14,6 +14,8 @@ from app.pipelines.train_xgboost import train_xgboost
 from app.pipelines.train_gradient_boosting import train_gradient_boosting
 from app.pipelines.train_ensemble import train_ensemble
 from app.pipelines.select_best_model import select_best_model
+from app.pipelines.training_dataset import build_training_dataset
+
 
 
 run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
@@ -77,3 +79,11 @@ def run_training_pipeline(horizon: int = 1):
     select_best_model(horizon)
 
     print("\n✅ Training pipeline completed successfully")
+import argparse
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--horizon", type=int, default=1)
+    args = parser.parse_args()
+
+    run_training_pipeline(horizon=args.horizon)

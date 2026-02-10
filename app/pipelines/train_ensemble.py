@@ -2,11 +2,13 @@ from pathlib import Path
 import joblib
 import numpy as np
 from sklearn.metrics import mean_squared_error
+import numpy as np
+from datetime import datetime
 
-from app.db.mongo import register_model
+from app.db.mongo import get_model_registry
 
 
-class MeanEnsemble:
+class SimpleEnsemble:
     def __init__(self, models):
         self.models = models
 
@@ -23,27 +25,30 @@ def train_ensemble(
     y_train,
     X_val,
     y_val,
-    horizon,
+    horizon: int
 ):
-    model = MeanEnsemble([rf_model, xgb_model, gb_model])
+    model = SimpleEnsemble([rf_model, xgb_model, gb_model])
 
     preds = model.predict(X_val)
-    rmse = mean_squared_error(y_val, preds, squared=False)
+    mse = mean_squared_error(y_val, preds)
+    rmse = float(np.sqrt(mse))
 
-    # ✅ SAVE MODEL
     model_dir = Path(f"models/ensemble_h{horizon}")
     model_dir.mkdir(parents=True, exist_ok=True)
-
     model_path = model_dir / "model.joblib"
     joblib.dump(model, model_path)
 
-    # ✅ REGISTER MODEL
-    register_model(
-        model_name="ensemble",
-        horizon=horizon,
-        model_path=str(model_path),
-        features=list(X_train.columns),
-        metrics={"rmse": rmse},
-    )
+    registry = get_model_registry()
+    registry.insert_one({
+    "model_name": "gradient_boosting",
+    "horizon": horizon,
+    "rmse": rmse,                     # ✅ TOP LEVEL
+    "model_path": str(model_path),
+    "features": list(X_train.columns),
+    "is_best": False,
+    "status": "candidate",
+    "created_at": datetime.utcnow(),
+    })
+
 
     return model, {"rmse": rmse}
