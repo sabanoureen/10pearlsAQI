@@ -5,6 +5,10 @@ from typing import List
 from app.db.mongo import get_model_registry, upsert_features
 from app.pipelines.final_feature_table import build_final_dataframe
 from app.pipelines.horizon_feature_filter import filter_features_for_horizon
+from pathlib import Path
+
+model_path = Path(model_doc["model_path"])
+
 
 
 def _load_production_model(horizon: int):

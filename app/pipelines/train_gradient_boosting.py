@@ -24,7 +24,16 @@ def train_gradient_boosting(X_train, y_train, X_val, y_val, horizon: int):
 
     model_dir = Path(f"models/gbr_h{horizon}")
     model_dir.mkdir(parents=True, exist_ok=True)
+    from pathlib import Path
+
+    model_dir = Path("models") / f"gbr_h{horizon}"
+    model_dir.mkdir(parents=True, exist_ok=True)
+
     model_path = model_dir / "model.joblib"
+    joblib.dump(model, model_path)
+
+    model_path_str = model_path.as_posix()
+
     joblib.dump(model, model_path)
 
     registry = get_model_registry()
