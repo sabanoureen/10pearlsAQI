@@ -50,15 +50,15 @@ def run_training_pipeline(horizon: int = 1):
     # 3️⃣ Train base models
     # -----------------------------
     rf_model, rf_metrics = train_random_forest(
-        X_train, y_train, X_val, y_val, horizon
+        X_train, y_train, X_val, y_val, horizon, run_id
     )
 
     xgb_model, xgb_metrics = train_xgboost(
-        X_train, y_train, X_val, y_val, horizon
+        X_train, y_train, X_val, y_val, horizon, run_id
     )
 
     gb_model, gb_metrics = train_gradient_boosting(
-        X_train, y_train, X_val, y_val, horizon
+        X_train, y_train, X_val, y_val, horizon, run_id
     )
 
     # -----------------------------
@@ -73,6 +73,7 @@ def run_training_pipeline(horizon: int = 1):
         X_val=X_val,
         y_val=y_val,
         horizon=horizon,
+        run_id=run_id,
     )
 
     # -----------------------------
