@@ -23,7 +23,7 @@ jobs:
 
       - name: Run feature pipeline
         env:
-          MONGO_URI: ${{ secrets.MONGO_URI }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
         run: |
           export PYTHONPATH=$PWD
           python -m app.pipelines.run_feature_pipeline

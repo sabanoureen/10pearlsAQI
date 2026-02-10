@@ -20,18 +20,20 @@ def register_model(
     )
 
     # 2️⃣ Insert new versioned model
-    get_model_registry().insert_one(doc)
-    ({
-        "model_name": model_name,
-        "horizon": horizon,
-        "version": version,              # ✅ IMPORTANT
-        "rmse": rmse,
-        "r2": r2,
-        "model_path": model_path,
-        "features": features,
-        "registered_at": datetime.utcnow(),
-        "status": "production",
-        "is_best": True
-    })
+doc = {
+    "model_name": model_name,
+    "horizon": horizon,
+    "version": version,
+    "rmse": rmse,
+    "r2": r2,
+    "model_path": model_path,
+    "features": features,
+    "registered_at": datetime.utcnow(),
+    "status": "production",
+    "is_best": True,
+}
 
-    print(f"📦 Registered {model_name} | horizon={horizon} | version={version}")
+get_model_registry().insert_one(doc)
+
+
+print(f"📦 Registered {model_name} | horizon={horizon} | version={version}")
