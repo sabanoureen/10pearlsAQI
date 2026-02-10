@@ -1,46 +1,41 @@
 from pathlib import Path
-import json
 import joblib
-import numpy as np
+import xgboost as xgb
+from sklearn.metrics import mean_squared_error
 
-from xgboost import XGBRegressor
-from sklearn.metrics import mean_squared_error, r2_score
-
-from app.pipelines.register_model import register_model
+from app.db.mongo import register_model
 
 
-def train_xgboost(X_train, y_train, X_val, y_val, horizon: int):
-    print("🚀 Training XGBoost")
-
-    model = XGBRegressor(
+def train_xgboost(X_train, y_train, X_val, y_val, horizon):
+    model = xgb.XGBRegressor(
         n_estimators=300,
         max_depth=6,
         learning_rate=0.05,
         subsample=0.8,
         colsample_bytree=0.8,
-        objective="reg:squarederror",
-        random_state=42
+        random_state=42,
+        tree_method="hist",
     )
+
     model.fit(X_train, y_train)
 
     preds = model.predict(X_val)
-    rmse = np.sqrt(mean_squared_error(y_val, preds))
-    r2 = r2_score(y_val, preds)
+    rmse = mean_squared_error(y_val, preds, squared=False)
 
-    model_dir = Path(f"models/xgboost_h{horizon}")
+    # ✅ SAVE MODEL
+    model_dir = Path(f"models/xgb_h{horizon}")
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    joblib.dump(model, model_dir / "model.joblib")
-    (model_dir / "features.json").write_text(json.dumps(list(X_train.columns)))
+    model_path = model_dir / "model.joblib"
+    joblib.dump(model, model_path)
 
+    # ✅ REGISTER MODEL
     register_model(
         model_name="xgboost",
         horizon=horizon,
-        rmse=rmse,
-        r2=r2,
-        model_path=str(model_dir / "model.joblib"),
-        features=list(X_train.columns)
+        model_path=str(model_path),
+        features=list(X_train.columns),
+        metrics={"rmse": rmse},
     )
 
-    print(f"✅ XGBoost done | RMSE={rmse:.2f} | R²={r2:.3f}")
-    return model, {"rmse": rmse, "r2": r2}
+    return model, {"rmse": rmse}

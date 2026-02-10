@@ -1,11 +1,9 @@
 from pathlib import Path
-import json
 import joblib
 import numpy as np
+from sklearn.metrics import mean_squared_error
 
-from sklearn.metrics import mean_squared_error, r2_score
-
-from app.pipelines.register_model import register_model
+from app.db.mongo import register_model
 
 
 class MeanEnsemble:
@@ -13,8 +11,8 @@ class MeanEnsemble:
         self.models = models
 
     def predict(self, X):
-        preds = [m.predict(X) for m in self.models]
-        return np.mean(preds, axis=0)
+        preds = np.column_stack([m.predict(X) for m in self.models])
+        return preds.mean(axis=1)
 
 
 def train_ensemble(
@@ -25,30 +23,27 @@ def train_ensemble(
     y_train,
     X_val,
     y_val,
-    horizon: int
+    horizon,
 ):
-    print("🤝 Training Ensemble Model")
-
     model = MeanEnsemble([rf_model, xgb_model, gb_model])
 
     preds = model.predict(X_val)
-    rmse = np.sqrt(mean_squared_error(y_val, preds))
-    r2 = r2_score(y_val, preds)
+    rmse = mean_squared_error(y_val, preds, squared=False)
 
+    # ✅ SAVE MODEL
     model_dir = Path(f"models/ensemble_h{horizon}")
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    joblib.dump(model, model_dir / "model.joblib")
-    (model_dir / "features.json").write_text(json.dumps(list(X_train.columns)))
+    model_path = model_dir / "model.joblib"
+    joblib.dump(model, model_path)
 
+    # ✅ REGISTER MODEL
     register_model(
         model_name="ensemble",
         horizon=horizon,
-        rmse=rmse,
-        r2=r2,
-        model_path=str(model_dir / "model.joblib"),
-        features=list(X_train.columns)
+        model_path=str(model_path),
+        features=list(X_train.columns),
+        metrics={"rmse": rmse},
     )
 
-    print(f"✅ Ensemble done | RMSE={rmse:.2f} | R²={r2:.3f}")
-    return model, {"rmse": rmse, "r2": r2}
+    return model, {"rmse": rmse}
