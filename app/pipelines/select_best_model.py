@@ -1,9 +1,10 @@
-from app.db.mongo import model_registry
-
+from app.db.mongo import get_model_registry
 
 
 def select_best_model(horizon: int):
     print(f"🏆 Selecting best model for horizon={horizon}")
+
+    model_registry = get_model_registry()
 
     models = list(
         model_registry.find(
