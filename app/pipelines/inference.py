@@ -84,3 +84,14 @@ def predict_multi_aqi(horizons: List[int]):
         results[f"{h}h"] = res
 
     return results
+from pathlib import Path
+import joblib
+
+model_path = Path(model_doc["model_path"]).as_posix()
+model_path = Path(model_path)
+
+if not model_path.exists():
+    raise FileNotFoundError(f"Model file not found: {model_path}")
+
+model = joblib.load(model_path)
+

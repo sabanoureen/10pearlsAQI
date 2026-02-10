@@ -8,7 +8,7 @@ from sklearn.metrics import mean_squared_error
 from app.db.mongo import get_model_registry
 
 
-def train_xgboost(X_train, y_train, X_val, y_val, horizon: int):
+def train_xgboost(X_train, y_train, X_val, y_val, horizon, run_id : int):
     model = xgb.XGBRegressor(
         n_estimators=500,
         max_depth=6,
@@ -40,6 +40,8 @@ def train_xgboost(X_train, y_train, X_val, y_val, horizon: int):
         "is_best": False,
         "status": "candidate",
         "created_at": datetime.utcnow(),
+        "version": run_id,
+
     })
 
     return model, {"rmse": rmse}

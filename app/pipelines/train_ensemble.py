@@ -24,7 +24,8 @@ def train_ensemble(
     y_train,
     X_val,
     y_val,
-    horizon: int
+    horizon,
+    run_id : int
 ):
     model = SimpleEnsemble([rf_model, xgb_model, gb_model])
 
@@ -48,6 +49,8 @@ def train_ensemble(
         "is_best": False,
         "status": "candidate",
         "created_at": datetime.utcnow(),
+        "version": run_id,
+
     })
 
     return model, {"rmse": rmse}

@@ -22,6 +22,8 @@ run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6
 print(f"🆔 Training run_id = {run_id}")
 
 
+
+
 def run_training_pipeline(horizon: int = 1):
     print("🚀 Starting training pipeline")
     print(f"📌 Forecast horizon: {horizon} hour(s)\n")

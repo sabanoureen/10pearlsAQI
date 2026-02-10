@@ -8,7 +8,7 @@ from sklearn.metrics import mean_squared_error
 from app.db.mongo import get_model_registry
 
 
-def train_random_forest(X_train, y_train, X_val, y_val, horizon: int):
+def train_random_forest(X_train, y_train, X_val, y_val, horizon, run_id : int):
     model = RandomForestRegressor(
         n_estimators=300,
         random_state=42,
@@ -37,6 +37,8 @@ def train_random_forest(X_train, y_train, X_val, y_val, horizon: int):
         "is_best": False,
         "status": "candidate",
         "created_at": datetime.utcnow(),
+        "version": run_id,
+
     })
 
     return model, {"rmse": rmse}
