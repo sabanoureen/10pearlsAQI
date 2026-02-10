@@ -8,9 +8,9 @@ from app.pipelines.horizon_feature_filter import filter_features_for_horizon
 
 
 # -------------------------------------------------
-# Load production model from MongoDB
+# Load production model
 # -------------------------------------------------
-def _load_production_model(horizon: int):
+def load_best_model(horizon: int):
     registry = get_model_registry()
 
     model_doc = registry.find_one(
@@ -23,12 +23,11 @@ def _load_production_model(horizon: int):
     model_path = Path(model_doc["model_path"])
 
     if not model_path.exists():
-        raise FileNotFoundError(f"Model file not found: {model_path}")
+        raise RuntimeError(f"Model file not found: {model_path}")
 
     model = joblib.load(model_path)
-    features = model_doc["features"]
 
-    return model, features, model_doc
+    return model, model_doc
 
 
 # -------------------------------------------------
@@ -36,25 +35,28 @@ def _load_production_model(horizon: int):
 # -------------------------------------------------
 def predict_aqi(horizon: int):
     try:
-        model, feature_order, model_doc = _load_production_model(horizon)
+        model, model_doc = load_best_model(horizon)
 
+        # 1️⃣ Build features
         df = build_final_dataframe()
         if df.empty:
             raise RuntimeError("Final feature dataframe is empty")
 
         X = df.drop(columns=["aqi_pm25", "timestamp"], errors="ignore")
         X = filter_features_for_horizon(X, horizon)
-        X = X[feature_order]
+        X = X[model_doc["features"]]
 
         X_last = X.dropna().tail(1)
         if X_last.empty:
             raise RuntimeError("No valid feature row available")
 
+        # 2️⃣ Save features (optional but good MLOps)
         upsert_features(
             city="Karachi",
-            features=X_last.to_dict(orient="records")[0]
+            features=X_last.to_dict(orient="records")[0],
         )
 
+        # 3️⃣ Predict
         pred = float(model.predict(X_last)[0])
 
         return {
@@ -77,21 +79,12 @@ def predict_aqi(horizon: int):
 # Multi-horizon prediction
 # -------------------------------------------------
 def predict_multi_aqi(horizons: List[int]):
-    results = {}
+    predictions = {}
 
     for h in horizons:
-        res = predict_aqi(h)
-        results[f"{h}h"] = res
+        predictions[f"{h}h"] = predict_aqi(h)
 
-    return results
-from pathlib import Path
-import joblib
-
-model_path = Path(model_doc["model_path"]).as_posix()
-model_path = Path(model_path)
-
-if not model_path.exists():
-    raise FileNotFoundError(f"Model file not found: {model_path}")
-
-model = joblib.load(model_path)
-
+    return {
+        "status": "success",
+        "predictions": predictions,
+    }
