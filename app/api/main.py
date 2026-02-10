@@ -26,14 +26,11 @@ class MultiPredictRequest(BaseModel):
 # -------------------
 @app.get("/health")
 def health():
-    try:
-        get_model_registry().find_one()
-        return {
-            "status": "ok",
-            "time": datetime.utcnow().isoformat()
-        }
-    except PyMongoError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {
+        "status": "ok",
+        "service": "AQI API",
+        "time": datetime.utcnow().isoformat()
+    }
 
 
 # -------------------
