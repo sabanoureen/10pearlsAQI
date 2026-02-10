@@ -23,7 +23,7 @@ def register_model(
 doc = {
     "model_name": model_name,
     "horizon": horizon,
-    "version": version,
+    "version": run_id,
     "rmse": rmse,
     "r2": r2,
     "model_path": model_path,
