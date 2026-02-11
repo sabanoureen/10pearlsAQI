@@ -31,51 +31,38 @@ def get_db():
 # -----------------------------------
 # Collection Accessors
 # -----------------------------------
-def get_feature_store():
-    return get_db()["feature_store"]
-
-
-def get_model_registry():
-    return get_db()["model_registry"]
-
-
-# -----------------------------------
-# Load Feature Store as DataFrame
-# -----------------------------------
 def load_feature_store_df():
     collection = get_feature_store()
 
-    # Fetch all documents
     data = list(collection.find({}, {"_id": 0}))
 
     if not data:
         raise RuntimeError("Feature store is empty")
 
-    # If features are nested inside "features"
-    if "features" in data[0]:
-        records = [doc["features"] for doc in data if "features" in doc]
-        df = pd.DataFrame(records)
-    else:
-        df = pd.DataFrame(data)
+    records = []
+
+    for doc in data:
+        record = {}
+
+        # Add feature values
+        if "features" in doc:
+            record.update(doc["features"])
+        else:
+            record.update(doc)
+
+        # Add datetime column
+        if "updated_at" in doc:
+            record["datetime"] = doc["updated_at"]
+
+        records.append(record)
+
+    df = pd.DataFrame(records)
 
     if df.empty:
         raise RuntimeError("No valid feature records found")
 
+    # Ensure datetime conversion
+    if "datetime" in df.columns:
+        df["datetime"] = pd.to_datetime(df["datetime"])
+
     return df
-
-
-# -----------------------------------
-# Upsert Features
-# -----------------------------------
-def upsert_features(city: str, features: dict):
-    get_feature_store().update_one(
-        {"city": city},
-        {
-            "$set": {
-                "city": city,
-                "features": features,
-                "updated_at": datetime.utcnow(),
-            }
-        },
-        upsert=True,
-    )
