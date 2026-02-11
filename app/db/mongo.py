@@ -72,8 +72,10 @@ def load_feature_store_df():
     if df.empty:
         raise RuntimeError("No valid feature records found")
 
-    # Ensure datetime conversion
-    if "datetime" in df.columns:
-        df["datetime"] = pd.to_datetime(df["datetime"])
+# ✅ ENSURE datetime column exists
+    if "datetime" not in df.columns:
+        df["datetime"] = pd.Timestamp.utcnow()
+
+    df["datetime"] = pd.to_datetime(df["datetime"])
 
     return df
