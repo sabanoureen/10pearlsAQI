@@ -31,6 +31,17 @@ def get_db():
 # -----------------------------------
 # Collection Accessors
 # -----------------------------------
+# -----------------------------------
+# Collection Accessors
+# -----------------------------------
+
+def get_feature_store():
+    return get_db()["feature_store"]
+
+
+def get_model_registry():
+    return get_db()["model_registry"]
+
 def load_feature_store_df():
     collection = get_feature_store()
 
