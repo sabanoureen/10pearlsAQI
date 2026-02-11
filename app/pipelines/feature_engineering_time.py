@@ -2,6 +2,17 @@ import pandas as pd
 import numpy as np
 
 def add_time_features(df):
+
+    # ✅ Ensure datetime exists
+    if "datetime" not in df.columns:
+        if "updated_at" in df.columns:
+            df["datetime"] = pd.to_datetime(df["updated_at"])
+        else:
+            # fallback: create current timestamp
+            df["datetime"] = pd.Timestamp.utcnow()
+
+    df["datetime"] = pd.to_datetime(df["datetime"])
+
     """
     Adds time-based features using datetime column.
     """
