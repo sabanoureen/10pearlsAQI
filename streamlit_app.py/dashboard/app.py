@@ -32,9 +32,10 @@ horizons = st.sidebar.multiselect(
 if st.button("Get Predictions"):
 
     response = requests.post(
-    API_URL + "/predict_multi",
+    f"{API_URL}/predict/multi",
     json={"horizons": horizons}
     )
+
 
 
     try:
@@ -63,3 +64,6 @@ if st.button("Get Predictions"):
         st.stop()
 
     df = pd.DataFrame(rows).sort_values("horizon")
+st.write(API_URL + "/predict_multi")
+st.write(response.status_code)
+st.write(response.text)
