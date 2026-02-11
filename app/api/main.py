@@ -27,27 +27,23 @@ def health_check():
 # -----------------------------------------
 # GENERATE + STORE FORECAST
 # -----------------------------------------
+from app.pipelines.predict_next_days import generate_forecast
+
 @app.get("/forecast/generate")
-def generate_forecast(horizon: int = 3):
+def generate(horizon: int = 1):
 
-    df = predict_next_3_days(horizon=horizon)
+    try:
+        result = generate_forecast(horizon)
+        return {
+            "status": "success",
+            "generated_at": result["generated_at"]
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
-    predictions = df.to_dict(orient="records")
-
-    db = get_db()
-
-    db["daily_forecast"].insert_one({
-        "horizon": horizon,
-        "generated_at": datetime.utcnow(),
-        "predictions": predictions
-    })
-
-    return {
-        "status": "success",
-        "horizon": horizon,
-        "generated_at": datetime.utcnow(),
-        "count": len(predictions)
-    }
 
 
 # -----------------------------------------
