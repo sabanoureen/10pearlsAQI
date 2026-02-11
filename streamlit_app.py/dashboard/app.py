@@ -32,9 +32,10 @@ horizons = st.sidebar.multiselect(
 if st.button("Get Predictions"):
 
     response = requests.post(
-        API_URL + "/predict_multi",
-        json={"horizons": horizons}
+    API_URL + "/predict_multi",
+    json={"horizons": horizons}
     )
+
 
     try:
         results = response.json()
