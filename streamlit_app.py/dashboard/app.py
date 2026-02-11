@@ -31,16 +31,26 @@ horizons = st.sidebar.multiselect(
 # ===============================
 if st.button("Get Predictions"):
 
-    response = requests.post(API_URL + "/predict_multi", json={"horizons": horizons})
-    results = response.json()
+    response = requests.post(
+        API_URL + "/predict_multi",
+        json={"horizons": horizons}
+    )
 
-    # ===============================
-    # CLEAN DATAFRAME
-    # ===============================
+    try:
+        results = response.json()
+    except:
+        st.error("Invalid response from API")
+        st.stop()
+
+    if not isinstance(results, dict):
+        st.error("API did not return valid prediction data")
+        st.write(results)
+        st.stop()
+
     rows = []
 
     for key, value in results.items():
-        if value["status"] == "success":
+        if isinstance(value, dict) and value.get("status") == "success":
             rows.append({
                 "horizon": int(key.replace("h", "")),
                 "predicted_aqi": value["predicted_aqi"]
@@ -48,45 +58,7 @@ if st.button("Get Predictions"):
 
     if not rows:
         st.error("No successful predictions received.")
+        st.write(results)
         st.stop()
 
     df = pd.DataFrame(rows).sort_values("horizon")
-
-    # ===============================
-    # METRICS
-    # ===============================
-    st.subheader("Model Information")
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Best Model", "Gradient Boosting")
-    col2.metric("R² Score", "0.85")
-    col3.metric("RMSE", "0.34")
-
-    # ===============================
-    # CHART
-    # ===============================
-    st.subheader("AQI Forecast")
-
-    fig = px.line(
-        df,
-        x="horizon",
-        y="predicted_aqi",
-        markers=True,
-        title="AQI Forecast"
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-    # ===============================
-    # TABLE
-    # ===============================
-    st.subheader("Forecast Details")
-    st.dataframe(df)
-
-    # ===============================
-    # ALERTS
-    # ===============================
-    if df["predicted_aqi"].max() > 150:
-        st.error("⚠️ Poor air quality expected.")
-    else:
-        st.success("✅ Air quality within acceptable limits.")
