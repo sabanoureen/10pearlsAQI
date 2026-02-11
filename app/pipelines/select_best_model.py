@@ -6,16 +6,28 @@ def select_best_model(horizon: int):
 
     model_registry = get_model_registry()
 
-    # Only consider models that actually have rmse
+    # Only consider candidate models with RMSE
     models = list(
         model_registry.find(
-            {"horizon": horizon, "rmse": {"$exists": True}},
-            {"_id": 1, "rmse": 1, "model_name": 1}
+            {
+                "horizon": horizon,
+                "rmse": {"$exists": True},
+                "status": "candidate"
+            },
+            {
+                "_id": 1,
+                "rmse": 1,
+                "mae": 1,
+                "model_name": 1,
+                "model_path": 1
+            }
         )
     )
 
     if not models:
-        raise RuntimeError(f"No valid models with rmse found for horizon={horizon}")
+        raise RuntimeError(
+            f"No valid candidate models found for horizon={horizon}"
+        )
 
     # Select model with lowest RMSE
     best_model = min(models, key=lambda m: m["rmse"])
@@ -34,7 +46,15 @@ def select_best_model(horizon: int):
 
     print(
         f"✅ Best model selected: {best_model['model_name']} "
-        f"(RMSE={best_model['rmse']:.2f})"
+        f"(RMSE={best_model['rmse']:.2f}, "
+        f"MAE={best_model.get('mae', 0):.2f})"
     )
 
-    return best_model
+    print(f"📁 Model path: {best_model['model_path']}")
+
+    return {
+        "model_name": best_model["model_name"],
+        "model_path": best_model["model_path"],
+        "rmse": best_model["rmse"],
+        "mae": best_model.get("mae", None)
+    }

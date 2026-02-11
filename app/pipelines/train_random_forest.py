@@ -3,12 +3,14 @@ import joblib
 import numpy as np
 from datetime import datetime
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 from app.db.mongo import get_model_registry
 
 
 def train_random_forest(X_train, y_train, X_val, y_val, horizon: int, run_id: str):
+
+    print("🌲 Training Random Forest...")
 
     model = RandomForestRegressor(
         n_estimators=300,
@@ -18,28 +20,44 @@ def train_random_forest(X_train, y_train, X_val, y_val, horizon: int, run_id: st
 
     model.fit(X_train, y_train)
 
+    # -------------------------------
+    # Validation Evaluation
+    # -------------------------------
     preds = model.predict(X_val)
-    rmse = float(np.sqrt(mean_squared_error(y_val, preds)))
 
-    # ✅ Correct directory
+    rmse = float(np.sqrt(mean_squared_error(y_val, preds)))
+    mae = float(mean_absolute_error(y_val, preds))
+
+    print(f"RF RMSE: {rmse:.2f}")
+    print(f"RF MAE : {mae:.2f}")
+
+    # -------------------------------
+    # Save Model (Versioned)
+    # -------------------------------
     model_dir = Path(f"models/rf_h{horizon}")
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    model_path = model_dir / "model.joblib"
+    model_filename = f"rf_{run_id}.joblib"
+    model_path = model_dir / model_filename
+
     joblib.dump(model, model_path)
 
+    # -------------------------------
+    # Register Model in Mongo
+    # -------------------------------
     registry = get_model_registry()
+
     registry.insert_one({
         "model_name": "random_forest",
         "horizon": horizon,
         "rmse": rmse,
+        "mae": mae,
         "model_path": model_path.as_posix(),
         "features": list(X_train.columns),
         "is_best": False,
         "status": "candidate",
         "created_at": datetime.utcnow(),
-        "version": run_id,
-
+        "version": run_id
     })
 
-    return model, {"rmse": rmse}
+    return model, {"rmse": rmse, "mae": mae}

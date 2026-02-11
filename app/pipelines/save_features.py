@@ -1,18 +1,17 @@
 from datetime import datetime
-from db.mongo import feature_collection
+from app.db.mongo import get_feature_store   # 🔥 THIS IMPORT WAS MISSING
 
-def save_features(city, features: dict):
+
+def save_features(city: str, row: dict):
+    collection = get_feature_store()
+
     doc = {
         "city": city,
-        "timestamp": datetime.utcnow(),
-        "features": features
+        "datetime": row.get("datetime"),
+        "aqi": row.get("aqi"),
+        **row,
+        "created_at": datetime.utcnow()
     }
-    feature_collection.insert_one(doc)
-from db.mongo import feature_store
-from datetime import datetime
 
-feature_store.insert_one({
-    "city": "Karachi",
-    "features": X_last.to_dict(),
-    "timestamp": datetime.utcnow()
-})
+    result = collection.insert_one(doc)
+    print("Inserted ID:", result.inserted_id)
