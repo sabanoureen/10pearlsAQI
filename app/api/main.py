@@ -1,17 +1,20 @@
-from fastapi import FastAPI, Query
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from datetime import datetime
+from fastapi.encoders import jsonable_encoder
 
 from app.pipelines.predict_3day_forecast import predict_next_3_days
-
+from app.db.mongo import get_db
 
 app = FastAPI(
     title="AQI Forecast API",
-    description="Multi-horizon AQI forecasting service",
-    version="1.0"
+    description="Multi-day AQI forecasting service",
+    version="2.0"
 )
 
 
+# -----------------------------------------
+# HEALTH CHECK
+# -----------------------------------------
 @app.get("/")
 def health_check():
     return {
@@ -21,26 +24,51 @@ def health_check():
     }
 
 
-@app.get("/forecast")
-def forecast(
-    horizon: int = Query(3, description="Forecast horizon in days (1,3,7)")
-):
-    try:
-        df = predict_next_3_days(horizon=horizon)
+# -----------------------------------------
+# GENERATE + STORE FORECAST
+# -----------------------------------------
+@app.get("/forecast/generate")
+def generate_forecast(horizon: int = 3):
 
-        # 🔥 Convert datetime to string
-        df["datetime"] = df["datetime"].astype(str)
+    df = predict_next_3_days(horizon=horizon)
 
-        results = df.to_dict("records")
+    predictions = df.to_dict(orient="records")
 
-        return JSONResponse(content={
-            "horizon_days": horizon,
-            "generated_at": datetime.utcnow().isoformat(),
-            "predictions": results
-        })
+    db = get_db()
 
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+    db["daily_forecast"].insert_one({
+        "horizon": horizon,
+        "generated_at": datetime.utcnow(),
+        "predictions": predictions
+    })
+
+    return {
+        "status": "success",
+        "horizon": horizon,
+        "generated_at": datetime.utcnow(),
+        "count": len(predictions)
+    }
+
+
+# -----------------------------------------
+# GET LATEST STORED FORECAST
+# -----------------------------------------
+@app.get("/forecast/latest")
+def get_latest_forecast(horizon: int = 3):
+
+    db = get_db()
+
+    doc = db["daily_forecast"].find_one(
+        {"horizon": horizon},
+        sort=[("generated_at", -1)]
+    )
+
+    if not doc:
+        return {"status": "error", "message": "No forecast found"}
+
+    return jsonable_encoder({
+        "status": "success",
+        "horizon": doc["horizon"],
+        "generated_at": doc["generated_at"],
+        "predictions": doc["predictions"]
+    })
