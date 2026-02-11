@@ -32,9 +32,13 @@ if st.sidebar.button("Generate New Forecast"):
 # ----------------------------------------
 if st.button("Load Latest Forecast"):
 
-    response = requests.get(
-        f"{API_URL}/forecast/latest?horizon={horizon}"
-    )
+    response = requests.get(f"{API_URL}/forecast?horizon={horizon}")
+
+if response.status_code != 200:
+    st.error("Failed to generate forecast.")
+else:
+    st.success("Forecast generated successfully!")
+
 
     results = response.json()
 
