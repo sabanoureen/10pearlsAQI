@@ -11,7 +11,7 @@ venv/
 Thumbs.db
 
 # Models & artifacts
-models/
+
 data/
 db/
 
