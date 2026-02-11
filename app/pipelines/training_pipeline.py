@@ -38,9 +38,8 @@ def run_training_pipeline(horizon: int = 1):
     if X.empty or y.empty:
         raise RuntimeError("Training dataset is empty")
 
-    print(f"📊 Dataset size: {df.shape[0]} rows")
-    print(f"📊 Feature count: {df.shape[1]} columns")
-
+    print(f"📊 Dataset size: {X.shape[0]} rows")
+    print(f"📊 Feature count: {X.shape[1]} columns")
 
     # -----------------------------------------
     # 2️⃣ Time-based split (NO SHUFFLE)
@@ -117,8 +116,3 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     run_training_pipeline(horizon=args.horizon)
-
-print("📊 Feature count:", X.shape[1])
-print("🧪 Training samples:", len(X_train))
-print("🧪 Validation samples:", len(X_val))
-print("📈 Best RMSE:", best_model["rmse"])
