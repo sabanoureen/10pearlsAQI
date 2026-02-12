@@ -15,7 +15,7 @@ def generate_multi_day_forecast(horizon: int = 3):
     db = get_db()
 
     # -------------------------------------------------
-    # 1️⃣ Load production model (Always horizon=1 model)
+    # 1️⃣ Load production model (always horizon=1)
     # -------------------------------------------------
     model, features = load_production_model(horizon=1)
 
@@ -24,7 +24,7 @@ def generate_multi_day_forecast(horizon: int = 3):
     print("====================================")
 
     # -------------------------------------------------
-    # 2️⃣ Get latest feature row from feature_store
+    # 2️⃣ Get latest feature row
     # -------------------------------------------------
     feature_store = db["feature_store"]
 
@@ -42,14 +42,12 @@ def generate_multi_day_forecast(horizon: int = 3):
 
     latest_doc = latest_doc[0]
 
-    # Extract only required features
     current_features = {
         col: latest_doc.get(col)
         for col in features
     }
 
     print("Initial Features Loaded:", current_features)
-    print("====================================")
 
     predictions = []
 
@@ -61,10 +59,8 @@ def generate_multi_day_forecast(horizon: int = 3):
         print(f"\n----- STEP {step} -----")
         print("Features BEFORE prediction:", current_features)
 
-        # Convert to dataframe
-        X = pd.DataFrame([current_features])
-
         # Predict
+        X = pd.DataFrame([current_features])
         pred = float(model.predict(X)[0])
 
         print("Prediction:", pred)
@@ -79,21 +75,27 @@ def generate_multi_day_forecast(horizon: int = 3):
         # -------------------------------------------------
         # 🔁 Shift lag features properly
         # -------------------------------------------------
-        lag_cols = [col for col in features if col.startswith("lag_")]
+        lag_cols = [col for col in features if "lag" in col]
 
-        # Sort descending: lag_3 → lag_2 → lag_1
-        lag_cols_sorted = sorted(
-            lag_cols,
-            key=lambda x: int(x.split("_")[1]),
-            reverse=True
-        )
+        if lag_cols:
+            # Sort by numeric lag (1h, 3h, 6h → 6h, 3h, 1h)
+            lag_cols_sorted = sorted(
+                lag_cols,
+                key=lambda x: int(x.split("_")[-1].replace("h", "")),
+                reverse=True
+            )
 
-        for i in range(len(lag_cols_sorted) - 1):
-            current_features[lag_cols_sorted[i]] = current_features[lag_cols_sorted[i + 1]]
+            # Shift values
+            for i in range(len(lag_cols_sorted) - 1):
+                current_features[lag_cols_sorted[i]] = current_features[lag_cols_sorted[i + 1]]
 
-        # Update lag_1 with new prediction
-        if "lag_1" in current_features:
-            current_features["lag_1"] = pred
+            # Update smallest lag with prediction
+            smallest_lag = sorted(
+                lag_cols,
+                key=lambda x: int(x.split("_")[-1].replace("h", ""))
+            )[0]
+
+            current_features[smallest_lag] = pred
 
         print("Features AFTER update:", current_features)
 
@@ -102,7 +104,7 @@ def generate_multi_day_forecast(horizon: int = 3):
     print("====================================")
 
     # -------------------------------------------------
-    # 4️⃣ Save forecast to MongoDB
+    # 4️⃣ Save forecast
     # -------------------------------------------------
     forecast_doc = {
         "horizon": horizon,
