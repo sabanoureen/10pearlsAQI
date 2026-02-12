@@ -8,49 +8,42 @@ Select Best Model
     - is_best = False for others
 """
 
-from app.db.mongo import model_registry
+from app.db.mongo import get_model_registry
 
 
 def select_best_model(horizon: int):
     print(f"🏆 Selecting best model for horizon={horizon}")
 
-    # -------------------------------------------------
-    # 1️⃣ Fetch all models for this horizon
-    # -------------------------------------------------
+    # 0️⃣ Get Mongo collection
+    model_registry = get_model_registry()
+
+    # 1️⃣ Fetch candidate models
     models = list(
         model_registry.find(
-            {"horizon": horizon},
-            {"_id": 1, "rmse": 1, "model_name": 1}
+            {
+                "horizon": horizon,
+                "status": "candidate",
+                "rmse": {"$exists": True}
+            },
+            {"_id": 1, "rmse": 1, "model_name": 1, "model_path": 1}
         )
     )
 
     if not models:
-        raise RuntimeError(f"No models found for horizon={horizon}")
+        raise RuntimeError(
+            f"No valid candidate models found for horizon={horizon}"
+        )
 
-    # -------------------------------------------------
-    # 2️⃣ Filter models that actually have RMSE
-    # -------------------------------------------------
-    valid_models = [m for m in models if "rmse" in m]
+    # 2️⃣ Select lowest RMSE
+    best_model = min(models, key=lambda m: m["rmse"])
 
-    if not valid_models:
-        raise RuntimeError(f"No models with RMSE found for horizon={horizon}")
-
-    # -------------------------------------------------
-    # 3️⃣ Pick model with lowest RMSE
-    # -------------------------------------------------
-    best_model = min(valid_models, key=lambda m: m["rmse"])
-
-    # -------------------------------------------------
-    # 4️⃣ Mark all models as not best
-    # -------------------------------------------------
+    # 3️⃣ Archive all models
     model_registry.update_many(
         {"horizon": horizon},
-        {"$set": {"is_best": False}}
+        {"$set": {"is_best": False, "status": "archived"}}
     )
 
-    # -------------------------------------------------
-    # 5️⃣ Mark selected model as best
-    # -------------------------------------------------
+    # 4️⃣ Promote best model
     model_registry.update_one(
         {"_id": best_model["_id"]},
         {"$set": {"is_best": True, "status": "production"}}
@@ -61,4 +54,12 @@ def select_best_model(horizon: int):
         f"(RMSE={best_model['rmse']:.2f})"
     )
 
-    return best_model
+    return {
+        "model_name": best_model["model_name"],
+        "model_path": best_model["model_path"],
+        "rmse": best_model["rmse"],
+    }
+
+
+if __name__ == "__main__":
+    select_best_model(horizon=1)

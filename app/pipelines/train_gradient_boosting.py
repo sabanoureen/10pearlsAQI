@@ -46,19 +46,21 @@ def train_gradient_boosting(X_train, y_train, X_val, y_val, horizon: int, run_id
     # -------------------------------
     # Register Model in Mongo
     # -------------------------------
+    # -------------------------------
+# Register Model in Mongo
+# -------------------------------
     registry = get_model_registry()
 
     registry.insert_one({
-        "model_name": "gradient_boosting",
-        "horizon": horizon,
-        "rmse": rmse,
-        "mae": mae,
-        "model_path": model_path.as_posix(),
-        "features": list(X_train.columns),
-        "is_best": False,
-        "status": "candidate",
-        "created_at": datetime.utcnow(),
-        "version": run_id
+    "model_name": "random_forest",
+    "horizon": horizon,
+    "rmse": rmse,
+    "mae": mae,
+    "model_path": str(model_path),   # 🔥 important
+    "features": list(X_train.columns),  # 🔥 important
+    "status": "candidate",
+    "is_best": False,
+    "registered_at": datetime.utcnow()
     })
 
     return model, {"rmse": rmse, "mae": mae}

@@ -10,14 +10,18 @@ from app.pipelines.feature_engineering_rolling import add_rolling_features
 
 
 def load_last_historical_rows(n=24):
-    db = get_db()
-    collection = db["historical_hourly_data"]
+   db = get_db()
+    collection = db["forecast_results"]
 
-    data = list(
-        collection.find({}, {"_id": 0})
-        .sort("datetime", -1)
-        .limit(n)
+    collection.insert_many(
+    df_forecast[["datetime", "predicted_aqi"]]
+    .assign(
+        horizon=horizon,
+        generated_at=datetime.utcnow()
     )
+    .to_dict("records")
+)
+
 
     df = pd.DataFrame(data)
     df["datetime"] = pd.to_datetime(df["datetime"])

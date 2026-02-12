@@ -52,16 +52,15 @@ def train_xgboost(X_train, y_train, X_val, y_val, horizon: int, run_id: str):
     registry = get_model_registry()
 
     registry.insert_one({
-        "model_name": "xgboost",
-        "horizon": horizon,
-        "rmse": rmse,
-        "mae": mae,
-        "model_path": model_path.as_posix(),
-        "features": list(X_train.columns),
-        "is_best": False,
-        "status": "candidate",
-        "created_at": datetime.utcnow(),
-        "version": run_id
+    "model_name": "random_forest",
+    "horizon": horizon,
+    "rmse": rmse,
+    "mae": mae,
+    "model_path": str(model_path),   # 🔥 important
+    "features": list(X_train.columns),  # 🔥 important
+    "status": "candidate",
+    "is_best": False,
+    "registered_at": datetime.utcnow()
     })
 
     return model, {"rmse": rmse, "mae": mae}
