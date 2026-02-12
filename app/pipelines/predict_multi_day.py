@@ -49,10 +49,12 @@ def generate_multi_day_forecast(horizon: int = 3):
     # -------------------------------------------------
     # 3️⃣ Rolling prediction loop
     # -------------------------------------------------
+        # -------------------------------------------------
+    # 3️⃣ Rolling prediction loop
+    # -------------------------------------------------
     for step in range(1, horizon + 1):
 
         X = pd.DataFrame([current_features])
-
         pred = float(model.predict(X)[0])
 
         future_datetime = datetime.utcnow() + timedelta(days=step)
@@ -62,7 +64,19 @@ def generate_multi_day_forecast(horizon: int = 3):
             "predicted_aqi": pred
         })
 
-        # 🔁 Update lag features for next step (important)
+        # 🔁 Shift lag features properly
+        lag_cols = [col for col in features if col.startswith("lag_")]
+
+        # Sort lag columns descending (lag_3 → lag_2 → lag_1)
+        lag_cols_sorted = sorted(
+            lag_cols,
+            key=lambda x: int(x.split("_")[1]),
+            reverse=True
+        )
+
+        for i in range(len(lag_cols_sorted) - 1):
+            current_features[lag_cols_sorted[i]] = current_features[lag_cols_sorted[i + 1]]
+
         if "lag_1" in current_features:
             current_features["lag_1"] = pred
 
