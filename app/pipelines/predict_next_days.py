@@ -1,6 +1,6 @@
 """
 Production Forecast Generator
-Generates N-day forecast using best production model
+Generates forecast using PRODUCTION model only
 """
 
 import joblib
@@ -8,7 +8,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 from app.db.mongo import get_db
-from app.pipelines.select_best_model import select_best_model
+from app.pipelines.load_production_model import load_production_model
 
 
 def generate_forecast(horizon: int = 1):
@@ -16,16 +16,9 @@ def generate_forecast(horizon: int = 1):
     db = get_db()
 
     # ----------------------------------
-    # 1️⃣ Get best model
+    # 1️⃣ Load PRODUCTION model
     # ----------------------------------
-    best_model = select_best_model(horizon)
-
-    if not best_model:
-        raise RuntimeError("No production model found")
-
-    model_path = best_model["model_path"]
-
-    model = joblib.load(model_path)
+    model, feature_columns = load_production_model(horizon)
 
     # ----------------------------------
     # 2️⃣ Load latest features
@@ -46,8 +39,6 @@ def generate_forecast(horizon: int = 1):
 
     latest_doc = latest_doc[0]
 
-    feature_columns = best_model["features"]
-
     X = pd.DataFrame([{
         col: latest_doc.get(col)
         for col in feature_columns
@@ -61,7 +52,7 @@ def generate_forecast(horizon: int = 1):
     # ----------------------------------
     # 4️⃣ Save forecast
     # ----------------------------------
-    forecast_collection = db["forecast_results"]
+    forecast_collection = db["daily_forecast"]
 
     forecast_doc = {
         "horizon": horizon,
