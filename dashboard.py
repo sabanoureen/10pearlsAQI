@@ -5,40 +5,47 @@ import plotly.express as px
 
 API_URL = "https://10pearlsaqi-production-848d.up.railway.app"
 
-st.set_page_config(page_title="AQI 3-Day Forecast", layout="wide")
+st.set_page_config(page_title="AQI Forecast", layout="wide")
 
 # ----------------------------------------
 # HEADER
 # ----------------------------------------
-st.title("🌍 AQI 3-Day Forecast Dashboard")
-st.markdown("Machine Learning powered air quality forecasting")
+st.title("🌍 AQI Multi-Day Forecast Dashboard")
+st.markdown("Machine Learning powered air quality forecasting system")
 
 # ----------------------------------------
 # SIDEBAR
 # ----------------------------------------
 st.sidebar.header("Configuration")
-horizon = st.sidebar.selectbox("Forecast Horizon (Days)", [1, 3, 7], index=1)
+horizon = st.sidebar.selectbox(
+    "Forecast Horizon (Days)",
+    [1, 3, 7],
+    index=1
+)
 
 # ----------------------------------------
-# GENERATE BUTTON
+# GENERATE NEW FORECAST
 # ----------------------------------------
-if st.sidebar.button("Generate New Forecast"):
+if st.sidebar.button("🔄 Generate New Forecast"):
     with st.spinner("Generating forecast..."):
-        requests.get(f"{API_URL}/forecast/generate?horizon={horizon}")
-    st.success("Forecast generated successfully!")
+        gen = requests.get(f"{API_URL}/forecast/generate?horizon={horizon}")
+    if gen.status_code == 200:
+        st.success("Forecast generated successfully!")
+    else:
+        st.error("Forecast generation failed.")
 
 # ----------------------------------------
-# LOAD STORED FORECAST
+# LOAD LATEST FORECAST
 # ----------------------------------------
-if st.button("Load Latest Forecast"):
+if st.button("📊 Load Latest Forecast"):
 
-    response = requests.get(f"{API_URL}/forecast?horizon={horizon}")
+    response = requests.get(
+        f"{API_URL}/forecast/latest?horizon={horizon}"
+    )
 
-if response.status_code != 200:
-    st.error("Failed to generate forecast.")
-else:
-    st.success("Forecast generated successfully!")
-
+    if response.status_code != 200:
+        st.error("API connection failed.")
+        st.stop()
 
     results = response.json()
 
@@ -55,21 +62,24 @@ else:
     df["datetime"] = pd.to_datetime(df["datetime"])
 
     # ----------------------------------------
-    # INFO
+    # INFO SECTION
     # ----------------------------------------
-    st.subheader("Forecast Generated At")
+    st.subheader("📅 Forecast Generated At")
     st.write(results["generated_at"])
 
     latest_aqi = df["predicted_aqi"].iloc[0]
 
     col1, col2 = st.columns(2)
     col1.metric("Latest AQI", round(latest_aqi, 2))
-    col2.metric("Max AQI (Next Days)", round(df["predicted_aqi"].max(), 2))
+    col2.metric(
+        "Max AQI (Next Days)",
+        round(df["predicted_aqi"].max(), 2)
+    )
 
     # ----------------------------------------
     # CHART
     # ----------------------------------------
-    st.subheader("AQI Forecast Trend")
+    st.subheader("📈 AQI Forecast Trend")
 
     fig = px.line(
         df,
@@ -84,13 +94,17 @@ else:
     # ----------------------------------------
     # TABLE
     # ----------------------------------------
-    st.subheader("Forecast Details")
+    st.subheader("📋 Forecast Details")
     st.dataframe(df)
 
     # ----------------------------------------
-    # ALERTS
+    # ALERT SYSTEM
     # ----------------------------------------
-    if df["predicted_aqi"].max() > 150:
+    max_aqi = df["predicted_aqi"].max()
+
+    if max_aqi > 150:
         st.error("⚠️ Poor air quality expected.")
+    elif max_aqi > 100:
+        st.warning("⚠️ Moderate air quality.")
     else:
         st.success("✅ Air quality within acceptable limits.")
