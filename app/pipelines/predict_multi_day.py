@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 
 from app.db.mongo import get_db
 from app.pipelines.load_production_model import load_production_model
-from app.pipelines.final_feature_table import build_final_dataframe
 
 
 def generate_multi_day_forecast(horizon: int = 3):
@@ -18,29 +17,34 @@ def generate_multi_day_forecast(horizon: int = 3):
     # -------------------------------------------------
     # 1️⃣ Load production model
     # -------------------------------------------------
-    model, features = load_production_model(horizon=1)
+    model, features, model_version = load_production_model(horizon=1)
 
     # -------------------------------------------------
-    # 2️⃣ Build full feature dataframe (important fix)
+    # 2️⃣ Get latest feature row
     # -------------------------------------------------
-    df = build_final_dataframe()
+    latest_doc = (
+        db["feature_store"]
+        .find()
+        .sort("datetime", -1)
+        .limit(1)
+    )
 
-    df = df.dropna().reset_index(drop=True)
+    latest_doc = list(latest_doc)
 
-    if df.empty:
-        raise RuntimeError("No valid feature rows found")
+    if not latest_doc:
+        raise RuntimeError("No feature data found")
 
-    latest_row = df.iloc[-1]
+    latest_doc = latest_doc[0]
 
     current_features = {
-        col: latest_row[col]
+        col: latest_doc.get(col)
         for col in features
     }
 
     predictions = []
 
     # -------------------------------------------------
-    # 3️⃣ Rolling recursive prediction
+    # 3️⃣ Rolling recursive forecast
     # -------------------------------------------------
     for step in range(1, horizon + 1):
 
@@ -54,7 +58,7 @@ def generate_multi_day_forecast(horizon: int = 3):
             "predicted_aqi": pred
         })
 
-        # 🔁 Update lag features properly
+        # 🔁 Shift lag features dynamically
         lag_cols = [col for col in features if "lag" in col]
 
         if lag_cols:
@@ -75,12 +79,12 @@ def generate_multi_day_forecast(horizon: int = 3):
             current_features[smallest_lag] = pred
 
     # -------------------------------------------------
-    # 4️⃣ Save forecast with model version
+    # 4️⃣ Save forecast
     # -------------------------------------------------
     forecast_doc = {
         "horizon": horizon,
         "generated_at": datetime.utcnow(),
-        "model_version": "production_v1",
+        "model_version": model_version,
         "predictions": predictions
     }
 

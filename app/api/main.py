@@ -12,9 +12,6 @@ app = FastAPI(
 )
 
 
-# -----------------------------------------
-# HEALTH CHECK
-# -----------------------------------------
 @app.get("/")
 def health_check():
     return {
@@ -24,9 +21,6 @@ def health_check():
     }
 
 
-# -----------------------------------------
-# GENERATE MULTI-DAY FORECAST
-# -----------------------------------------
 @app.get("/forecast/multi")
 def multi_forecast(days: int = 3):
 
@@ -37,7 +31,7 @@ def multi_forecast(days: int = 3):
             "status": "success",
             "horizon": days,
             "generated_at": result["generated_at"],
-            "model_version": result.get("model_version", "unknown"),
+            "model_version": result["model_version"],
             "predictions": result["predictions"]
         }
 
@@ -45,9 +39,6 @@ def multi_forecast(days: int = 3):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# -----------------------------------------
-# GET LATEST STORED FORECAST
-# -----------------------------------------
 @app.get("/forecast/latest")
 def get_latest_forecast(horizon: int = 3):
 
@@ -68,27 +59,3 @@ def get_latest_forecast(horizon: int = 3):
         "model_version": doc.get("model_version", "unknown"),
         "predictions": doc["predictions"]
     })
-
-
-# -----------------------------------------
-# HISTORICAL AQI ENDPOINT
-# -----------------------------------------
-@app.get("/aqi/history")
-def get_history(limit: int = 100):
-
-    db = get_db()
-
-    data = list(
-        db["processed_data"]
-        .find()
-        .sort("datetime", -1)
-        .limit(limit)
-    )
-
-    if not data:
-        raise HTTPException(status_code=404, detail="No historical data found")
-
-    for d in data:
-        d["_id"] = str(d["_id"])
-
-    return {"status": "success", "data": data}
