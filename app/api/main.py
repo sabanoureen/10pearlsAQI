@@ -8,8 +8,9 @@ from app.pipelines.predict_multi_day import generate_multi_day_forecast
 app = FastAPI(
     title="AQI Forecast API",
     description="Multi-day AQI forecasting service",
-    version="3.0"
+    version="3.1"
 )
+
 
 # -----------------------------------------
 # HEALTH CHECK
@@ -36,6 +37,7 @@ def multi_forecast(days: int = 3):
             "status": "success",
             "horizon": days,
             "generated_at": result["generated_at"],
+            "model_version": result.get("model_version", "unknown"),
             "predictions": result["predictions"]
         }
 
@@ -63,6 +65,7 @@ def get_latest_forecast(horizon: int = 3):
         "status": "success",
         "horizon": doc["horizon"],
         "generated_at": doc["generated_at"],
+        "model_version": doc.get("model_version", "unknown"),
         "predictions": doc["predictions"]
     })
 

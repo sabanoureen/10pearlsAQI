@@ -102,6 +102,15 @@ if st.button("📊 Load Forecast"):
         f"<h3 style='color:{color}'>Air Quality Status: {status}</h3>",
         unsafe_allow_html=True
     )
+    # -----------------------------------------
+# MODEL INFORMATION
+# -----------------------------------------
+    st.subheader("🤖 Model Information")
+
+    colA, colB = st.columns(2)
+
+    colA.info(f"Generated At: {results.get('generated_at', 'N/A')}")
+    colB.info(f"Model Version: {results.get('model_version', 'Unknown')}")
 
     # -----------------------------------------
     # GAUGE
