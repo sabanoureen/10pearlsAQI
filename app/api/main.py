@@ -67,3 +67,24 @@ def get_latest_forecast(horizon: int = 1):
         "generated_at": doc["generated_at"],
         "predictions": doc["predictions"]
     })
+from app.pipelines.predict_multi_day import generate_multi_day_forecast
+
+
+@app.get("/forecast/multi")
+def multi_forecast(days: int = 3):
+
+    try:
+        result = generate_multi_day_forecast(days)
+
+        return {
+            "status": "success",
+            "horizon": days,
+            "generated_at": result["generated_at"],
+            "predictions": result["predictions"]
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
