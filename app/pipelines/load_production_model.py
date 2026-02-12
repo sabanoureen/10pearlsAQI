@@ -1,5 +1,5 @@
-
 import joblib
+from pathlib import Path
 from app.db.mongo import get_model_registry
 
 
@@ -18,6 +18,32 @@ def load_production_model(horizon: int):
             f"No production model found for horizon={horizon}"
         )
 
-    model = joblib.load(model_doc["model_path"])
+    model_path = Path(model_doc["model_path"])
 
-    return model, model_doc["features"]
+    # ---------------------------------------
+    # Ensure correct absolute path
+    # ---------------------------------------
+    if not model_path.is_absolute():
+        model_path = Path.cwd() / model_path
+
+    # ---------------------------------------
+    # Check file exists
+    # ---------------------------------------
+    if not model_path.exists():
+        raise RuntimeError(
+            f"Model file not found on server: {model_path}"
+        )
+
+    # ---------------------------------------
+    # Load model safely
+    # ---------------------------------------
+    model = joblib.load(model_path)
+
+    features = model_doc.get("features")
+
+    if not features:
+        raise RuntimeError(
+            "Production model has no feature list saved."
+        )
+
+    return model, features
