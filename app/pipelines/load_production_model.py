@@ -43,7 +43,3 @@ def load_production_model(horizon: int):
 
     if not features:
         raise RuntimeError(
-            "Production model has no feature list saved."
-        )
-
-    return model, features
