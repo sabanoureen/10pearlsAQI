@@ -13,12 +13,15 @@ import uuid
 import argparse
 import os
 
+from app.db.mongo import get_model_registry   # ✅ ADD THIS
 from app.pipelines.train_random_forest import train_random_forest
 from app.pipelines.train_xgboost import train_xgboost
 from app.pipelines.train_gradient_boosting import train_gradient_boosting
 from app.pipelines.train_ensemble import train_ensemble
 from app.pipelines.select_best_model import select_best_model
 from app.pipelines.training_dataset import build_training_dataset
+
+
 
 
 def run_training_pipeline(horizon: int = 1):
