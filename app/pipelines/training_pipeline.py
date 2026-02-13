@@ -76,3 +76,14 @@ def run_training_pipeline(horizon: int = 1):
         print("\n❌ TRAINING FAILED")
         print(str(e))
         raise
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--horizon",
+        type=int,
+        default=1,
+        help="Forecast horizon in DAYS"
+    )
+    args = parser.parse_args()
+
+    run_training_pipeline(horizon=args.horizon)
