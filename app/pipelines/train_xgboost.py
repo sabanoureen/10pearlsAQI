@@ -1,18 +1,30 @@
-import pickle
+from pathlib import Path
+import joblib
+import xgboost as xgb
 import numpy as np
 from datetime import datetime
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 from app.db.mongo import get_model_registry
 
 
-def train_random_forest(X_train, y_train, X_val, y_val, horizon: int):
+def train_xgboost(
+    X_train,
+    y_train,
+    X_val,
+    y_val,
+    horizon: int,
+    run_id: str,   # ✅ ADD THIS
+):
 
-    print("🌲 Training Random Forest...")
+    print("⚡ Training XGBoost...")
 
-    model = RandomForestRegressor(
-        n_estimators=300,
+    model = xgb.XGBRegressor(
+        n_estimators=500,
+        max_depth=6,
+        learning_rate=0.05,
+        subsample=0.8,
+        colsample_bytree=0.8,
         random_state=42,
         n_jobs=-1
     )
@@ -23,30 +35,35 @@ def train_random_forest(X_train, y_train, X_val, y_val, horizon: int):
 
     rmse = float(np.sqrt(mean_squared_error(y_val, preds)))
     mae = float(mean_absolute_error(y_val, preds))
-    r2 = float(r2_score(y_val, preds))
 
-    print(f"RF RMSE: {rmse:.4f}")
-    print(f"RF MAE : {mae:.4f}")
-    print(f"RF R²  : {r2:.4f}")
+    print(f"XGB RMSE: {rmse:.4f}")
+    print(f"XGB MAE : {mae:.4f}")
 
-    # 🔥 Serialize model
-    model_binary = pickle.dumps(model)
+    # Save versioned model
+    model_dir = Path(f"models/xgb_h{horizon}")
+    model_dir.mkdir(parents=True, exist_ok=True)
+
+    model_filename = f"xgb_{run_id}.joblib"
+    model_path = model_dir / model_filename
+
+    joblib.dump(model, model_path)
+
+    print(f"✅ XGBoost saved to: {model_path}")
 
     registry = get_model_registry()
 
     registry.insert_one({
-        "model_name": "random_forest",
+        "model_name": "xgboost",
         "horizon": horizon,
         "rmse": rmse,
         "mae": mae,
-        "r2": r2,
-        "model_binary": model_binary,  # 🔥 STORED IN MONGO
+        "model_path": str(model_path),
         "features": list(X_train.columns),
         "status": "candidate",
         "is_best": False,
         "registered_at": datetime.utcnow()
     })
 
-    print("✅ Random Forest stored in MongoDB")
+    print("✅ XGBoost registered in Mongo")
 
-    return model, {"rmse": rmse, "mae": mae, "r2": r2}
+    return model, {"rmse": rmse, "mae": mae}

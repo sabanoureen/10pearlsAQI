@@ -23,7 +23,8 @@ def train_ensemble(
     y_train,
     X_val,
     y_val,
-    horizon: int
+    horizon: int,
+    run_id: str,
 ):
 
     print("🤝 Training Ensemble...")
