@@ -59,21 +59,5 @@ def get_latest_forecast(horizon: int = 3):
         "model_version": doc.get("model_version", "unknown"),
         "predictions": doc["predictions"]
     })
-from app.pipelines.shap_analysis import generate_shap_analysis
 
 
-@app.get("/forecast/shap")
-def shap_analysis():
-
-    try:
-        result = generate_shap_analysis()
-
-        return {
-            "status": "success",
-            "model_version": result["model_version"],
-            "prediction": result["prediction"],
-            "contributions": result["contributions"]
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
