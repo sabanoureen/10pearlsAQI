@@ -19,12 +19,12 @@ def get_db():
     MONGODB_URI = os.getenv("MONGODB_URI")
 
     if not MONGODB_URI:
-        raise RuntimeError("MONGODB_URI not set")
+        raise RuntimeError("MONGODB_URI not set in environment variables")
+
+    MONGODB_URI = MONGODB_URI.strip()
 
     _client = MongoClient(MONGODB_URI)
     _db = _client["aqi_system"]
-
-    print("✅ Connected to MongoDB")
 
     return _db
 
