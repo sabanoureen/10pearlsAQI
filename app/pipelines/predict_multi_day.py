@@ -80,3 +80,5 @@ def generate_multi_day_forecast(horizon: int = 3):
     db["daily_forecast"].insert_one(forecast_doc)
 
     return forecast_doc
+
+

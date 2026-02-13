@@ -17,6 +17,7 @@ def load_production_model(horizon: int):
         raise RuntimeError(
             f"No production model found for horizon={horizon}"
         )
+    print("PRODUCTION MODEL DOC:", model_doc) 
 
     model_path = Path(model_doc["model_path"])
 
