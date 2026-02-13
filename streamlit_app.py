@@ -2,8 +2,6 @@ import streamlit as st
 import requests
 import pandas as pd
 import plotly.graph_objects as go
-import matplotlib.pyplot as plt
-import shap
 
 # =========================================
 # CONFIG
@@ -31,7 +29,6 @@ def get_aqi_status(aqi):
     else:
         return "Hazardous", "purple"
 
-
 # =========================================
 # HEADER
 # =========================================
@@ -50,18 +47,12 @@ horizon = st.sidebar.selectbox(
     index=1
 )
 
-# =========================================
-# GENERATE FORECAST
-# =========================================
 if st.sidebar.button("🔄 Generate Forecast"):
-    with st.spinner("Generating forecast..."):
-        r = requests.get(f"{API_URL}/forecast/multi?days={horizon}")
-
+    r = requests.get(f"{API_URL}/forecast/multi?days={horizon}")
     if r.status_code == 200:
         st.success("Forecast generated successfully!")
     else:
         st.error("Failed to generate forecast")
-
 
 # =========================================
 # LOAD FORECAST
@@ -81,11 +72,6 @@ if st.button("📊 Load Forecast"):
         st.stop()
 
     df = pd.DataFrame(results["predictions"])
-
-    if df.empty:
-        st.error("Forecast data empty.")
-        st.stop()
-
     df["datetime"] = pd.to_datetime(df["datetime"])
     df = df.sort_values("datetime").reset_index(drop=True)
 
@@ -95,11 +81,8 @@ if st.button("📊 Load Forecast"):
 
     status, color = get_aqi_status(latest_aqi)
 
-    # =========================================
     # KPI
-    # =========================================
     col1, col2, col3 = st.columns(3)
-
     col1.metric("Latest AQI", round(latest_aqi, 2))
     col2.metric("Max AQI", round(max_aqi, 2))
     col3.metric("Average AQI", round(avg_aqi, 2))
@@ -109,19 +92,13 @@ if st.button("📊 Load Forecast"):
         unsafe_allow_html=True
     )
 
-    # =========================================
-    # MODEL INFO
-    # =========================================
+    # Model Info
     st.subheader("🤖 Model Information")
-
     colA, colB = st.columns(2)
-
     colA.info(f"Generated At: {results.get('generated_at', 'N/A')}")
     colB.info(f"Model Version: {results.get('model_version', 'production_v1')}")
 
-    # =========================================
-    # GAUGE
-    # =========================================
+    # Gauge
     st.subheader("🌡 AQI Gauge")
 
     gauge = go.Figure(go.Indicator(
@@ -142,55 +119,16 @@ if st.button("📊 Load Forecast"):
 
     st.plotly_chart(gauge, use_container_width=True)
 
-    # =========================================
-    # HEALTH ADVISORY
-    # =========================================
-    st.subheader("🏥 Health Advisory")
-
-    if latest_aqi <= 50:
-        st.success("Air quality is good. Enjoy outdoor activities.")
-    elif latest_aqi <= 100:
-        st.info("Air quality acceptable. Sensitive groups should be cautious.")
-    elif latest_aqi <= 150:
-        st.warning("Sensitive groups should reduce outdoor exposure.")
-    elif latest_aqi <= 200:
-        st.error("Unhealthy for everyone. Avoid outdoor activity.")
-    else:
-        st.error("Hazardous air quality. Stay indoors.")
-
-    # =========================================
-    # HISTORICAL + FORECAST GRAPH
-    # =========================================
-    st.subheader("📊 Historical + Forecast Trend")
-
-    history_res = requests.get(f"{API_URL}/aqi/history?limit=100")
-
-    if history_res.status_code == 200:
-        history_df = pd.DataFrame(history_res.json()["data"])
-        history_df["datetime"] = pd.to_datetime(history_df["datetime"])
-        history_df = history_df.sort_values("datetime")
-    else:
-        history_df = pd.DataFrame()
+    # Forecast Graph
+    st.subheader("📊 Forecast Trend")
 
     fig = go.Figure()
-
-    if not history_df.empty:
-        fig.add_trace(
-            go.Scatter(
-                x=history_df["datetime"],
-                y=history_df["aqi"],
-                mode="lines",
-                name="Historical AQI"
-            )
-        )
-
     fig.add_trace(
         go.Scatter(
             x=df["datetime"],
             y=df["predicted_aqi"],
             mode="lines+markers",
-            name="Forecast AQI",
-            line=dict(dash="dash")
+            name="Forecast AQI"
         )
     )
 
@@ -203,74 +141,17 @@ if st.button("📊 Load Forecast"):
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # =========================================
-    # SHAP ANALYSIS (Basic Version)
-    # =========================================
-    st.subheader("🔎 SHAP Feature Importance")
-
-    if st.button("Show SHAP Analysis"):
-
-        try:
-            shap_res = requests.get(f"{API_URL}/forecast/shap")
-
-            if shap_res.status_code == 200:
-                shap_data = shap_res.json()
-
-                shap_df = pd.DataFrame(shap_data["shap_values"])
-                shap_df = shap_df.sort_values("importance", ascending=False)
-
-                st.bar_chart(shap_df.set_index("feature")["importance"])
-
-            else:
-                st.warning("SHAP endpoint not available yet.")
-
-        except Exception as e:
-            st.error("SHAP analysis failed.")
-
-    # =========================================
-    # TABLE
-    # =========================================
     st.subheader("📋 Forecast Data")
     st.dataframe(df, use_container_width=True)
 
 else:
     st.info("Click 'Load Forecast' to view predictions.")
+
 # =========================================
-# SHAP ANALYSIS
+# SHAP PLACEHOLDER (SAFE)
 # =========================================
+st.divider()
 st.subheader("🧠 Model Explainability (SHAP)")
 
-if st.button("Show SHAP Analysis"):
-
-    shap_res = requests.get(f"{API_URL}/forecast/shap")
-
-    if shap_res.status_code == 200:
-
-        shap_data = shap_res.json()
-
-        shap_df = pd.DataFrame(shap_data["contributions"])
-
-        fig = go.Figure()
-
-        fig.add_trace(
-            go.Bar(
-                x=shap_df["shap_value"],
-                y=shap_df["feature"],
-                orientation="h"
-            )
-        )
-
-        fig.update_layout(
-            template="plotly_white",
-            height=600,
-            title="Top Feature Contributions",
-            xaxis_title="Impact on AQI Prediction",
-            yaxis_title="Feature"
-        )
-
-        st.plotly_chart(fig, use_container_width=True)
-
-        st.success(f"Prediction: {round(shap_data['prediction'], 2)}")
-
-    else:
-        st.error("SHAP analysis failed.")
+if st.button("Show SHAP Analysis", key="shap_button"):
+    st.warning("SHAP endpoint not fully implemented yet.")
