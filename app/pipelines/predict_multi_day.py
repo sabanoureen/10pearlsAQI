@@ -14,22 +14,16 @@ def generate_multi_day_forecast(horizon: int = 3):
 
     db = get_db()
 
-    # -------------------------------------------------
     # 1️⃣ Load production model
-    # -------------------------------------------------
     model, features, model_version = load_production_model(horizon=1)
 
-    # -------------------------------------------------
     # 2️⃣ Get latest feature row
-    # -------------------------------------------------
-    latest_doc = (
+    latest_doc = list(
         db["feature_store"]
         .find()
         .sort("datetime", -1)
         .limit(1)
     )
-
-    latest_doc = list(latest_doc)
 
     if not latest_doc:
         raise RuntimeError("No feature data found")
@@ -43,9 +37,7 @@ def generate_multi_day_forecast(horizon: int = 3):
 
     predictions = []
 
-    # -------------------------------------------------
-    # 3️⃣ Rolling recursive forecast
-    # -------------------------------------------------
+    # 3️⃣ Rolling forecast
     for step in range(1, horizon + 1):
 
         X = pd.DataFrame([current_features])
@@ -58,7 +50,7 @@ def generate_multi_day_forecast(horizon: int = 3):
             "predicted_aqi": pred
         })
 
-        # 🔁 Shift lag features dynamically
+        # Shift lag features
         lag_cols = [col for col in features if "lag" in col]
 
         if lag_cols:
@@ -78,9 +70,6 @@ def generate_multi_day_forecast(horizon: int = 3):
 
             current_features[smallest_lag] = pred
 
-    # -------------------------------------------------
-    # 4️⃣ Save forecast
-    # -------------------------------------------------
     forecast_doc = {
         "horizon": horizon,
         "generated_at": datetime.utcnow(),
