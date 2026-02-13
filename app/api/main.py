@@ -8,52 +8,106 @@ from app.pipelines.shap_analysis import generate_shap_analysis
 
 app = FastAPI(
     title="AQI Forecast API",
-    version="3.2"
+    description="Multi-day AQI forecasting service",
+    version="4.0"
 )
 
+
+# ==============================
+# ROOT HEALTH
+# ==============================
 @app.get("/")
-def health():
+def health_check():
     return {
         "status": "ok",
-        "timestamp": datetime.utcnow()
+        "message": "AQI Forecast API running",
+        "timestamp": datetime.utcnow().isoformat()
     }
 
+
+# ==============================
+# MULTI-DAY FORECAST
+# ==============================
 @app.get("/forecast/multi")
 def multi_forecast(days: int = 3):
     try:
         result = generate_multi_day_forecast(days)
-        return result
+
+        return {
+            "status": "success",
+            "horizon": days,
+            "generated_at": result["generated_at"],
+            "model_version": result["model_version"],
+            "predictions": result["predictions"]
+        }
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ==============================
+# LATEST FORECAST
+# ==============================
+@app.get("/forecast/latest")
+def get_latest_forecast(horizon: int = 3):
+
+    db = get_db()
+
+    doc = db["daily_forecast"].find_one(
+        {"horizon": horizon},
+        sort=[("generated_at", -1)]
+    )
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="No forecast found")
+
+    return {
+        "status": "success",
+        "horizon": int(doc["horizon"]),
+        "generated_at": str(doc["generated_at"]),
+        "model_version": doc.get("model_version", "unknown"),
+        "predictions": doc["predictions"]
+    }
+
+
+# ==============================
+# SHAP ANALYSIS
+# ==============================
 @app.get("/forecast/shap")
-def shap_endpoint():
+def shap_analysis():
     try:
-        return generate_shap_analysis()
+        result = generate_shap_analysis()
+
+        return jsonable_encoder({
+            "status": "success",
+            "model_version": result["model_version"],
+            "generated_at": result["generated_at"],
+            "prediction": float(result["prediction"]),
+            "contributions": result["contributions"]
+        })
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ==============================
+# MODEL METRICS
+# ==============================
 @app.get("/models/metrics")
 def get_model_metrics():
 
     from app.db.mongo import get_model_registry
 
     collection = get_model_registry()
-
-    models = list(
-        collection.find(
-            {"status": "registered"},
-            {"_id": 0}   # ✅ REMOVE ObjectId
-        )
-    )
+    models = list(collection.find({"status": "registered"}))
 
     formatted = []
 
     for m in models:
         formatted.append({
             "model_name": m.get("model_name"),
-            "rmse": m.get("rmse"),
-            "r2": m.get("r2")
+            "rmse": float(m.get("rmse", 0)),
+            "r2": float(m.get("r2", 0))
         })
 
     return {
