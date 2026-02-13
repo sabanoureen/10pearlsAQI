@@ -156,7 +156,11 @@ with tab2:
         st.stop()
 
     # Best model
-    best_model = models_df.sort_values("rmse").iloc[0]
+    if "rmse" in models_df.columns:
+        best_model = models_df.sort_values("rmse").iloc[0]
+    else:
+        best_model = models_df.iloc[0]
+
 
     st.success(
         f"🏆 Best Model: {best_model['name']} "
@@ -180,35 +184,44 @@ with tab2:
 # ============================================================
 # TAB 3 — SHAP ANALYSIS
 # ============================================================
+# ============================================================
+# TAB 3 — SHAP ANALYSIS
+# ============================================================
 with tab3:
 
     try:
-        shap_response = requests.get(f"{API_BASE_URL}/shap")
+        shap_response = requests.get(f"{API_BASE_URL}/forecast/shap")
         shap_data = shap_response.json()
     except:
         st.warning("Unable to fetch SHAP data.")
         st.stop()
 
-    if "shap_values" not in shap_data:
-        st.warning("SHAP values not available.")
+    if "contributions" not in shap_data:
+        st.warning("SHAP contributions not available.")
         st.stop()
 
-    shap_df = pd.DataFrame(shap_data["shap_values"])
+    shap_df = pd.DataFrame(shap_data["contributions"])
 
-    shap_df = shap_df.sort_values(
-        by="value",
-        key=lambda x: abs(x),
-        ascending=False
+    # Rename for consistency
+    shap_df = shap_df.rename(columns={
+        "shap_value": "value"
+    })
+
+    # Sort by absolute impact
+    shap_df = shap_df.reindex(
+        shap_df["value"].abs().sort_values(ascending=False).index
     ).head(5)
 
-    # Positive / Negative Coloring
+    # Color coding
     shap_df["color"] = shap_df["value"].apply(
         lambda x: "green" if x > 0 else "red"
     )
 
-    # ==========================
-    # SHAP Bar Chart
-    # ==========================
+    st.subheader("Top 5 Feature Impact on AQI")
+
+    # ----------------------
+    # BAR CHART
+    # ----------------------
     fig_bar = go.Figure()
 
     fig_bar.add_trace(
@@ -221,17 +234,16 @@ with tab3:
     )
 
     fig_bar.update_layout(
-        title="Top 5 Feature Impact on AQI",
         xaxis_title="SHAP Value (Impact)",
         yaxis_title="Feature"
     )
 
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    # ==========================
-    # WATERFALL STYLE
-    # ==========================
-    base_value = shap_data.get("base_value", 0)
+    # ----------------------
+    # WATERFALL
+    # ----------------------
+    base_value = shap_data.get("prediction", 0) - shap_df["value"].sum()
 
     fig_waterfall = go.Figure(go.Waterfall(
         name="SHAP Waterfall",
@@ -239,7 +251,7 @@ with tab3:
         measure=["absolute"] + ["relative"] * len(shap_df),
         y=["Base Value"] + shap_df["feature"].tolist(),
         x=[base_value] + shap_df["value"].tolist(),
-        connector={"line": {"color": "rgb(63, 63, 63)"}},
+        connector={"line": {"color": "gray"}},
     ))
 
     fig_waterfall.update_layout(
