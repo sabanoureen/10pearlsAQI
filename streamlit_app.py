@@ -235,3 +235,42 @@ if st.button("📊 Load Forecast"):
 
 else:
     st.info("Click 'Load Forecast' to view predictions.")
+# =========================================
+# SHAP ANALYSIS
+# =========================================
+st.subheader("🧠 Model Explainability (SHAP)")
+
+if st.button("Show SHAP Analysis"):
+
+    shap_res = requests.get(f"{API_URL}/forecast/shap")
+
+    if shap_res.status_code == 200:
+
+        shap_data = shap_res.json()
+
+        shap_df = pd.DataFrame(shap_data["contributions"])
+
+        fig = go.Figure()
+
+        fig.add_trace(
+            go.Bar(
+                x=shap_df["shap_value"],
+                y=shap_df["feature"],
+                orientation="h"
+            )
+        )
+
+        fig.update_layout(
+            template="plotly_white",
+            height=600,
+            title="Top Feature Contributions",
+            xaxis_title="Impact on AQI Prediction",
+            yaxis_title="Feature"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.success(f"Prediction: {round(shap_data['prediction'], 2)}")
+
+    else:
+        st.error("SHAP analysis failed.")
