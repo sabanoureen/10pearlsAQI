@@ -8,7 +8,13 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 from app.db.mongo import get_model_registry
 
 
-def train_gradient_boosting(X_train, y_train, X_val, y_val, horizon):
+def train_gradient_boosting(
+    X_train,
+    y_train,
+    X_val,
+    y_val,
+    horizon: int
+):
 
     print("🌊 Training Gradient Boosting...")
 
