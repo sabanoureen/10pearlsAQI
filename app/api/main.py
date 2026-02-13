@@ -61,3 +61,13 @@ def get_latest_forecast(horizon: int = 3):
     })
 
 
+from app.pipelines.shap_analysis import generate_shap_analysis
+@app.get("/forecast/shap")
+def shap_analysis():
+
+    try:
+        result = generate_shap_analysis()
+        return result
+
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
