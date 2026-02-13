@@ -156,48 +156,59 @@ else:
 # =========================================
 # SHAP SECTION (PRODUCTION)
 # =========================================
+# =========================================
+# SHAP SECTION (PRODUCTION)
+# =========================================
 st.divider()
 st.subheader("🧠 Model Explainability (SHAP)")
 
 if st.button("Show SHAP Analysis", key="shap_button"):
 
-    shap_res = requests.get(f"{API_URL}/forecast/shap")
+    with st.spinner("Calculating SHAP values..."):
+        shap_res = requests.get(f"{API_URL}/forecast/shap")
 
-    if shap_res.status_code == 200:
+    if shap_res.status_code != 200:
+        st.error("SHAP API request failed.")
+        st.stop()
 
-        shap_data = shap_res.json()
+    shap_data = shap_res.json()
 
-        if shap_data.get("status") != "success":
-            st.error("SHAP analysis failed.")
-            st.stop()
+    if shap_data.get("status") != "success":
+        st.error("SHAP analysis failed.")
+        st.stop()
 
-        shap_df = pd.DataFrame(shap_data["contributions"])
+    shap_df = pd.DataFrame(shap_data["contributions"])
 
-        # Sort by absolute importance
-        shap_df["abs_val"] = shap_df["shap_value"].abs()
-        shap_df = shap_df.sort_values("abs_val", ascending=True)
+    # Sort by importance
+    shap_df = shap_df.sort_values(
+        by="shap_value",
+        key=abs,
+        ascending=True
+    )
 
-        fig = go.Figure()
+    # Plot horizontal bar chart
+    fig = go.Figure()
 
-        fig.add_trace(
-            go.Bar(
-                x=shap_df["shap_value"],
-                y=shap_df["feature"],
-                orientation="h"
-            )
+    fig.add_trace(
+        go.Bar(
+            x=shap_df["shap_value"],
+            y=shap_df["feature"],
+            orientation="h"
         )
+    )
 
-        fig.update_layout(
-            template="plotly_white",
-            height=600,
-            title="Feature Contributions to AQI Prediction",
-            xaxis_title="Impact on AQI",
-            yaxis_title="Feature"
-        )
+    fig.update_layout(
+        template="plotly_white",
+        height=600,
+        title="Feature Impact on AQI Prediction",
+        xaxis_title="SHAP Value (Impact)",
+        yaxis_title="Feature"
+    )
 
-        st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, use_container_width=True)
 
-        st.success(f"Prediction: {round(shap_data['prediction'], 2)}")
+    st.success(
+        f"Prediction explained: {round(shap_data['prediction'], 2)}"
+    )
 
-    else:
-        st.error("SHAP endpoint not reachable.")
+    st.info(f"Model Version: {shap_data['model_version']}")
