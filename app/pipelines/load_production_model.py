@@ -20,36 +20,23 @@ def load_production_model(horizon: int):
 
     model_path = Path(model_doc["model_path"])
 
-    # ---------------------------------------
-    # Ensure correct absolute path
-    # ---------------------------------------
+    # Make absolute path
     if not model_path.is_absolute():
         model_path = Path.cwd() / model_path
 
-    # ---------------------------------------
-    # Check file exists
-    # ---------------------------------------
     if not model_path.exists():
         raise RuntimeError(
             f"Model file not found on server: {model_path}"
         )
 
-    # ---------------------------------------
-    # Load model safely
-    # ---------------------------------------
     model = joblib.load(model_path)
 
     features = model_doc.get("features")
+    model_version = model_doc.get("model_version", "production_v1")
 
     if not features:
         raise RuntimeError(
             "Production model has no feature list saved."
         )
 
-    # ---------------------------------------
-    # NEW: Add model version
-    # ---------------------------------------
-    model_version = model_doc.get("model_version", "production_v1")
-
     return model, features, model_version
-
