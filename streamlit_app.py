@@ -54,11 +54,18 @@ with tab1:
 
         data = response.json()
 
+        if "predictions" not in data:
+            st.error("Invalid API response.")
+            st.stop()
+
         df = pd.DataFrame(data["predictions"])
 
-        # Rename for safety
+        # 🔥 FIX COLUMN MISMATCH
         if "predicted_aqi" in df.columns:
-            df.rename(columns={"predicted_aqi": "aqi"}, inplace=True)
+            df = df.rename(columns={
+                "predicted_aqi": "aqi",
+                "datetime": "date"
+            })
 
         if "aqi" not in df.columns:
             st.error(f"Prediction column not found: {df.columns}")
@@ -70,35 +77,9 @@ with tab1:
         col2.metric("Max AQI", round(df["aqi"].max(), 2))
         col3.metric("Average AQI", round(df["aqi"].mean(), 2))
 
-        # AQI category
-        latest = df["aqi"].iloc[0]
-
-        if latest <= 50:
-            status = "Good"
-            color = "green"
-        elif latest <= 100:
-            status = "Moderate"
-            color = "orange"
-        elif latest <= 150:
-            status = "Unhealthy for Sensitive Groups"
-            color = "darkorange"
-        elif latest <= 200:
-            status = "Unhealthy"
-            color = "red"
-        elif latest <= 300:
-            status = "Very Unhealthy"
-            color = "purple"
-        else:
-            status = "Hazardous"
-            color = "maroon"
-
-        st.markdown(
-            f"<h2 style='color:{color}'>Air Quality Status: {status}</h2>",
-            unsafe_allow_html=True
-        )
-
         fig = px.line(df, x="date", y="aqi", markers=True)
         st.plotly_chart(fig, use_container_width=True)
+
 
 # ====================================================
 # TAB 2 — MODEL METRICS
