@@ -24,28 +24,26 @@ from app.pipelines.training_dataset import build_training_dataset
 def run_training_pipeline(horizon: int = 1):
 
     try:
-        run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
+        run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 
         print(f"\n🆔 Training run_id = {run_id}")
         print("🚀 Starting training pipeline")
-        print(f"📌 Forecast horizon: {horizon} day(s)")
-        print(f"📌 Shift applied: {24*horizon} hours\n")
+        print(f"📌 Forecast horizon: {horizon} day(s)\n")
 
-        # -----------------------------------------
-        # 1️⃣ Build dataset
-        # -----------------------------------------
-        print("📦 Building training dataset...")
+        # Build dataset
         X, y = build_training_dataset(horizon)
 
         if X.empty or y.empty:
             raise RuntimeError("Training dataset is empty")
 
         print(f"📊 Dataset size: {X.shape[0]} rows")
-        print(f"📊 Feature count: {X.shape[1]} columns")
 
-        # -----------------------------------------
-        # 2️⃣ Time-based split
-        # -----------------------------------------
+        # Clean old models
+        registry = get_model_registry()
+        registry.delete_many({"horizon": horizon})
+        print("🧹 Old models deleted")
+
+        # Split
         split_idx = int(len(X) * 0.8)
 
         X_train = X.iloc[:split_idx]
@@ -53,32 +51,12 @@ def run_training_pipeline(horizon: int = 1):
         y_train = y.iloc[:split_idx]
         y_val   = y.iloc[split_idx:]
 
-        print(f"🧪 Training samples: {len(X_train)}")
-        print(f"🧪 Validation samples: {len(X_val)}\n")
+        # Train models
+        rf_model, _ = train_random_forest(X_train, y_train, X_val, y_val, horizon)
+        xgb_model, _ = train_xgboost(X_train, y_train, X_val, y_val, horizon)
+        gb_model, _ = train_gradient_boosting(X_train, y_train, X_val, y_val, horizon)
 
-        # Ensure models directory exists
-        os.makedirs("models", exist_ok=True)
-
-        # -----------------------------------------
-        # 3️⃣ Train models
-        # -----------------------------------------
-        print("🌲 Training Random Forest...")
-        rf_model, rf_metrics = train_random_forest(
-            X_train, y_train, X_val, y_val, horizon, run_id
-        )
-
-        print("⚡ Training XGBoost...")
-        xgb_model, xgb_metrics = train_xgboost(
-            X_train, y_train, X_val, y_val, horizon, run_id
-        )
-
-        print("🌊 Training Gradient Boosting...")
-        gb_model, gb_metrics = train_gradient_boosting(
-            X_train, y_train, X_val, y_val, horizon, run_id
-        )
-
-        print("🤝 Training Ensemble...")
-        ensemble_model, ensemble_metrics = train_ensemble(
+        ensemble_model, _ = train_ensemble(
             rf_model=rf_model,
             xgb_model=xgb_model,
             gb_model=gb_model,
@@ -86,24 +64,15 @@ def run_training_pipeline(horizon: int = 1):
             y_train=y_train,
             X_val=X_val,
             y_val=y_val,
-            horizon=horizon,
-            run_id=run_id,
+            horizon=horizon
         )
 
-        # -----------------------------------------
-        # 4️⃣ Select best model
-        # -----------------------------------------
-        print("\n🏆 Selecting best model...")
         best_model_info = select_best_model(horizon)
 
-        print(
-            f"\n🎯 Production Model: {best_model_info['model_name']} "
-            f"(RMSE={best_model_info['rmse']:.2f})"
-        )
-
-        print("\n✅ Training pipeline completed successfully")
+        print(f"\n🎯 Production Model: {best_model_info['model_name']}")
+        print("✅ Training pipeline completed")
 
     except Exception as e:
-        print("\n❌ TRAINING PIPELINE FAILED")
+        print("\n❌ TRAINING FAILED")
         print(str(e))
         raise
