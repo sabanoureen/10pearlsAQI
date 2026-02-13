@@ -34,13 +34,13 @@ def run_training_pipeline(horizon: int = 1):
         y_train = y.iloc[:split_idx]
         y_val = y.iloc[split_idx:]
 
-        rf_model, _ = train_random_forest(X_train, y_train, X_val, y_val, horizon)
-        xgb_model, _ = train_xgboost(X_train, y_train, X_val, y_val, horizon)
-        gb_model, _ = train_gradient_boosting(X_train, y_train, X_val, y_val, horizon)
+        rf_model, _ = train_random_forest(X_train, y_train, X_val, y_val, horizon, run_id)
+        xgb_model, _ = train_xgboost(X_train, y_train, X_val, y_val, horizon, run_id)
+        gb_model, _ = train_gradient_boosting(X_train, y_train, X_val, y_val, horizon, run_id)
 
         ensemble_model, _ = train_ensemble(
             rf_model, xgb_model, gb_model,
-            X_train, y_train, X_val, y_val, horizon
+            X_train, y_train, X_val, y_val, horizon, run_id
         )
 
         best_model_info = select_best_model(horizon)

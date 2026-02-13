@@ -7,8 +7,7 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from app.db.mongo import get_model_registry
 
 
-def train_random_forest(X_train, y_train, X_val, y_val, horizon: int, run_id: str
-):
+def train_random_forest(X_train, y_train, X_val, y_val, horizon: int, run_id: str):
 
     print("🌲 Training Random Forest...")
 
