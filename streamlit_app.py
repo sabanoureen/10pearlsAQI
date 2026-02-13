@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 API_URL = "https://10pearlsaqi-production-848d.up.railway.app"
 
 st.set_page_config(
-    page_title="AQI Forecast Dashboard",
+    page_title="AQI Predictor Dashboard",
     page_icon="🌍",
     layout="wide"
 )
@@ -29,12 +29,6 @@ def get_aqi_status(aqi):
     else:
         return "Hazardous", "purple"
 
-# =========================================
-# HEADER
-# =========================================
-st.title("🌍 AQI Forecast Dashboard")
-st.markdown("### Machine Learning powered air quality forecasting system")
-st.divider()
 
 # =========================================
 # SIDEBAR
@@ -47,12 +41,12 @@ horizon = st.sidebar.selectbox(
     index=1
 )
 
-if st.sidebar.button("🔄 Generate Forecast"):
-    r = requests.get(f"{API_URL}/forecast/multi?days={horizon}")
-    if r.status_code == 200:
-        st.success("Forecast generated successfully!")
-    else:
-        st.error("Failed to generate forecast")
+# =========================================
+# HEADER
+# =========================================
+st.title("🌍 AQI Predictor Dashboard")
+st.markdown("### Machine Learning powered air quality forecasting system")
+st.divider()
 
 # =========================================
 # LOAD FORECAST
@@ -66,14 +60,9 @@ if st.button("📊 Load Forecast"):
         st.stop()
 
     results = response.json()
-
-    if results.get("status") != "success":
-        st.error("No forecast available.")
-        st.stop()
-
     df = pd.DataFrame(results["predictions"])
     df["datetime"] = pd.to_datetime(df["datetime"])
-    df = df.sort_values("datetime").reset_index(drop=True)
+    df = df.sort_values("datetime")
 
     latest_aqi = df["predicted_aqi"].iloc[-1]
     max_aqi = df["predicted_aqi"].max()
@@ -81,7 +70,7 @@ if st.button("📊 Load Forecast"):
 
     status, color = get_aqi_status(latest_aqi)
 
-    # KPI
+    # ================= KPI =================
     col1, col2, col3 = st.columns(3)
     col1.metric("Latest AQI", round(latest_aqi, 2))
     col2.metric("Max AQI", round(max_aqi, 2))
@@ -92,35 +81,8 @@ if st.button("📊 Load Forecast"):
         unsafe_allow_html=True
     )
 
-    # Model Info
-    st.subheader("🤖 Model Information")
-    colA, colB = st.columns(2)
-    colA.info(f"Generated At: {results.get('generated_at', 'N/A')}")
-    colB.info(f"Model Version: {results.get('model_version', 'production_v1')}")
-
-    # Gauge
-    st.subheader("🌡 AQI Gauge")
-
-    gauge = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=latest_aqi,
-        title={'text': "Forecast AQI"},
-        gauge={
-            'axis': {'range': [0, 300]},
-            'steps': [
-                {'range': [0, 50], 'color': "green"},
-                {'range': [50, 100], 'color': "yellow"},
-                {'range': [100, 150], 'color': "orange"},
-                {'range': [150, 200], 'color': "red"},
-                {'range': [200, 300], 'color': "purple"},
-            ],
-        }
-    ))
-
-    st.plotly_chart(gauge, use_container_width=True)
-
-    # Forecast Graph
-    st.subheader("📊 Forecast Trend")
+    # ================= FORECAST GRAPH =================
+    st.subheader("📈 Forecast Trend")
 
     fig = go.Figure()
     fig.add_trace(
@@ -134,38 +96,21 @@ if st.button("📊 Load Forecast"):
 
     fig.update_layout(
         template="plotly_white",
-        height=500,
-        xaxis_title="Date",
-        yaxis_title="AQI"
+        height=450
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-    st.subheader("📋 Forecast Data")
-    st.dataframe(df, use_container_width=True)
-
 else:
     st.info("Click 'Load Forecast' to view predictions.")
 
-# =========================================
-# SHAP PLACEHOLDER (SAFE)
-# =========================================
-# =========================================
-# SHAP SECTION (PRODUCTION)
-# =========================================
-# =========================================
-# SHAP SECTION (PRODUCTION)
-# =========================================
-# =========================================
-# SHAP SECTION (PRODUCTION)
-# =========================================
-# =========================================
-# SHAP SECTION (Advanced Version)
-# =========================================
+# =====================================================
+# SHAP SECTION
+# =====================================================
 st.divider()
 st.subheader("🧠 Model Explainability (SHAP)")
 
-if st.button("Show SHAP Analysis", key="shap_button"):
+if st.button("Show SHAP Analysis"):
 
     shap_res = requests.get(f"{API_URL}/forecast/shap")
 
@@ -175,67 +120,61 @@ if st.button("Show SHAP Analysis", key="shap_button"):
 
     shap_data = shap_res.json()
 
-    if shap_data.get("status") != "success":
-        st.error("SHAP endpoint error.")
-        st.stop()
-
     shap_df = pd.DataFrame(shap_data["contributions"])
 
-    # 🔹 Sort by absolute importance
-    shap_df["abs_val"] = shap_df["shap_value"].abs()
-    shap_df = shap_df.sort_values("abs_val", ascending=False)
+    # ================= TOP 5 FEATURES =================
+    shap_df["abs_value"] = shap_df["shap_value"].abs()
+    shap_df = shap_df.sort_values("abs_value", ascending=False).head(5)
 
-    # 🔹 Top 5 only
-    shap_df = shap_df.head(5)
+    prediction = shap_data["prediction"]
+    model_version = shap_data["model_version"]
 
-    # 🔹 Color coding
+    # ================= COLOR CODING =================
     shap_df["color"] = shap_df["shap_value"].apply(
         lambda x: "green" if x > 0 else "red"
     )
 
-    st.markdown("### 🔝 Top 5 Feature Impact")
-
-    # =====================================
-    # Waterfall Style Plot
-    # =====================================
-    base_value = shap_data["prediction"] - shap_df["shap_value"].sum()
+    # ================= WATERFALL =================
+    st.subheader("📊 Waterfall Explanation of AQI Prediction")
 
     fig = go.Figure()
 
-    running_total = base_value
+    # Base value (start from 0 for simplicity)
+    base_value = 0
+    cumulative = base_value
 
-    # Base value bar
-    fig.add_trace(go.Bar(
-        x=[base_value],
-        y=["Base Value"],
-        orientation="h",
-        marker_color="gray"
-    ))
-
-    # Contribution bars
-    for _, row in shap_df.iterrows():
-
-        fig.add_trace(go.Bar(
-            x=[row["shap_value"]],
-            y=[row["feature"]],
+    fig.add_trace(
+        go.Bar(
+            x=[base_value],
+            y=["Base Value"],
             orientation="h",
-            marker_color=row["color"]
-        ))
+            marker_color="gray",
+            name="Base"
+        )
+    )
+
+    for _, row in shap_df.iterrows():
+        fig.add_trace(
+            go.Bar(
+                x=[row["shap_value"]],
+                y=[row["feature"]],
+                orientation="h",
+                marker_color=row["color"],
+                name=row["feature"]
+            )
+        )
+        cumulative += row["shap_value"]
 
     fig.update_layout(
-        title="Waterfall Explanation of AQI Prediction",
-        barmode="relative",
-        height=500,
         template="plotly_white",
-        xaxis_title="Impact on AQI",
-        yaxis_title="Feature"
+        height=500,
+        showlegend=False,
+        xaxis_title="Impact on AQI"
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # =====================================
-    # Prediction Summary
-    # =====================================
-    st.success(f"Final Prediction: {round(shap_data['prediction'], 2)}")
+    # ================= PREDICTION BOX =================
+    st.success(f"Prediction explained: {round(prediction,2)}")
 
-    st.info(f"Model Version: {shap_data['model_version']}")
+    st.info(f"Model Version: {model_version}")
