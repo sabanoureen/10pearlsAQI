@@ -27,9 +27,6 @@ def train_gradient_boosting(
 
     model.fit(X_train, y_train)
 
-    # -------------------------------
-    # Validation Evaluation
-    # -------------------------------
     preds = model.predict(X_val)
 
     rmse = float(np.sqrt(mean_squared_error(y_val, preds)))
@@ -38,31 +35,24 @@ def train_gradient_boosting(
     print(f"GBR RMSE: {rmse:.2f}")
     print(f"GBR MAE : {mae:.2f}")
 
-    # -------------------------------
-    # Save Model (Stable Path)
-    # -------------------------------
     model_dir = Path(f"models/gbr_h{horizon}")
     model_dir.mkdir(parents=True, exist_ok=True)
 
     model_path = model_dir / "model.joblib"
-
     joblib.dump(model, model_path)
 
     print(f"✅ Model saved to: {model_path}")
 
-    # -------------------------------
-    # Register Model in Mongo
-    # -------------------------------
     registry = get_model_registry()
 
     registry.insert_one({
-        "model_name": "gradient_boosting",   # ✅ FIXED
+        "model_name": "gradient_boosting",
         "horizon": horizon,
         "rmse": rmse,
         "mae": mae,
         "model_path": str(model_path),
         "features": list(X_train.columns),
-        "status": "candidate",
+        "status": "registered",   # ✅ FIXED
         "is_best": False,
         "registered_at": datetime.utcnow()
     })

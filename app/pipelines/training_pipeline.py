@@ -1,15 +1,10 @@
 def run_training_pipeline(horizon: int = 1):
 
     try:
-        run_id = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-
-        print(f"\n🆔 Training run_id = {run_id}")
-        print("🚀 Starting training pipeline")
+        print("\n🚀 Starting training pipeline")
         print(f"📌 Forecast horizon: {horizon} day(s)\n")
 
-        # -----------------------------------------
         # 1️⃣ Build dataset
-        # -----------------------------------------
         X, y = build_training_dataset(horizon)
 
         if X.empty or y.empty:
@@ -17,16 +12,12 @@ def run_training_pipeline(horizon: int = 1):
 
         print(f"📊 Dataset size: {X.shape[0]} rows")
 
-        # -----------------------------------------
-        # 2️⃣ Clean old models for this horizon
-        # -----------------------------------------
+        # 2️⃣ Clean old models
         registry = get_model_registry()
         registry.delete_many({"horizon": horizon})
         print("🧹 Old models deleted")
 
-        # -----------------------------------------
         # 3️⃣ Split
-        # -----------------------------------------
         split_idx = int(len(X) * 0.8)
 
         X_train = X.iloc[:split_idx]
@@ -34,19 +25,17 @@ def run_training_pipeline(horizon: int = 1):
         y_train = y.iloc[:split_idx]
         y_val   = y.iloc[split_idx:]
 
-        # -----------------------------------------
-        # 4️⃣ Train models (PASS run_id)
-        # -----------------------------------------
+        # 4️⃣ Train models
         rf_model, _ = train_random_forest(
-            X_train, y_train, X_val, y_val, horizon, run_id
+            X_train, y_train, X_val, y_val, horizon
         )
 
         xgb_model, _ = train_xgboost(
-            X_train, y_train, X_val, y_val, horizon, run_id
+            X_train, y_train, X_val, y_val, horizon
         )
 
         gb_model, _ = train_gradient_boosting(
-            X_train, y_train, X_val, y_val, horizon, run_id
+            X_train, y_train, X_val, y_val, horizon
         )
 
         ensemble_model, _ = train_ensemble(
@@ -57,13 +46,10 @@ def run_training_pipeline(horizon: int = 1):
             y_train=y_train,
             X_val=X_val,
             y_val=y_val,
-            horizon=horizon,
-            run_id=run_id
+            horizon=horizon
         )
 
-        # -----------------------------------------
         # 5️⃣ Select best model
-        # -----------------------------------------
         best_model_info = select_best_model(horizon)
 
         print(f"\n🎯 Production Model: {best_model_info['model_name']}")
