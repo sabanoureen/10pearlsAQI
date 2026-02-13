@@ -159,56 +159,83 @@ else:
 # =========================================
 # SHAP SECTION (PRODUCTION)
 # =========================================
+# =========================================
+# SHAP SECTION (Advanced Version)
+# =========================================
 st.divider()
 st.subheader("🧠 Model Explainability (SHAP)")
 
 if st.button("Show SHAP Analysis", key="shap_button"):
 
-    with st.spinner("Calculating SHAP values..."):
-        shap_res = requests.get(f"{API_URL}/forecast/shap")
+    shap_res = requests.get(f"{API_URL}/forecast/shap")
 
     if shap_res.status_code != 200:
-        st.error("SHAP API request failed.")
+        st.error("SHAP analysis failed.")
         st.stop()
 
     shap_data = shap_res.json()
 
     if shap_data.get("status") != "success":
-        st.error("SHAP analysis failed.")
+        st.error("SHAP endpoint error.")
         st.stop()
 
     shap_df = pd.DataFrame(shap_data["contributions"])
 
-    # Sort by importance
-    shap_df = shap_df.sort_values(
-        by="shap_value",
-        key=abs,
-        ascending=True
+    # 🔹 Sort by absolute importance
+    shap_df["abs_val"] = shap_df["shap_value"].abs()
+    shap_df = shap_df.sort_values("abs_val", ascending=False)
+
+    # 🔹 Top 5 only
+    shap_df = shap_df.head(5)
+
+    # 🔹 Color coding
+    shap_df["color"] = shap_df["shap_value"].apply(
+        lambda x: "green" if x > 0 else "red"
     )
 
-    # Plot horizontal bar chart
+    st.markdown("### 🔝 Top 5 Feature Impact")
+
+    # =====================================
+    # Waterfall Style Plot
+    # =====================================
+    base_value = shap_data["prediction"] - shap_df["shap_value"].sum()
+
     fig = go.Figure()
 
-    fig.add_trace(
-        go.Bar(
-            x=shap_df["shap_value"],
-            y=shap_df["feature"],
-            orientation="h"
-        )
-    )
+    running_total = base_value
+
+    # Base value bar
+    fig.add_trace(go.Bar(
+        x=[base_value],
+        y=["Base Value"],
+        orientation="h",
+        marker_color="gray"
+    ))
+
+    # Contribution bars
+    for _, row in shap_df.iterrows():
+
+        fig.add_trace(go.Bar(
+            x=[row["shap_value"]],
+            y=[row["feature"]],
+            orientation="h",
+            marker_color=row["color"]
+        ))
 
     fig.update_layout(
+        title="Waterfall Explanation of AQI Prediction",
+        barmode="relative",
+        height=500,
         template="plotly_white",
-        height=600,
-        title="Feature Impact on AQI Prediction",
-        xaxis_title="SHAP Value (Impact)",
+        xaxis_title="Impact on AQI",
         yaxis_title="Feature"
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-    st.success(
-        f"Prediction explained: {round(shap_data['prediction'], 2)}"
-    )
+    # =====================================
+    # Prediction Summary
+    # =====================================
+    st.success(f"Final Prediction: {round(shap_data['prediction'], 2)}")
 
     st.info(f"Model Version: {shap_data['model_version']}")
