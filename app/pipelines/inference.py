@@ -33,26 +33,32 @@ def load_best_model(horizon: int):
 # -------------------------------------------------
 # Single-horizon prediction
 # -------------------------------------------------
-def predict_aqi(horizon: int):
+def predict_aqi(horizon: int, city: str = "Karachi"):
     try:
         model, model_doc = load_best_model(horizon)
 
         # 1️⃣ Build features
-        df = build_final_dataframe()
+        df = build_final_dataframe(city=city)
+
         if df.empty:
             raise RuntimeError("Final feature dataframe is empty")
 
         X = df.drop(columns=["aqi_pm25", "timestamp"], errors="ignore")
+
+        # Filter horizon-specific features
         X = filter_features_for_horizon(X, horizon)
+
+        # Ensure exact feature order
         X = X[model_doc["features"]]
 
         X_last = X.dropna().tail(1)
+
         if X_last.empty:
             raise RuntimeError("No valid feature row available")
 
-        # 2️⃣ Save features (optional but good MLOps)
+        # 2️⃣ Log features (MLOps tracking)
         upsert_features(
-            city="Karachi",
+            city=city,
             features=X_last.to_dict(orient="records")[0],
         )
 
@@ -61,6 +67,7 @@ def predict_aqi(horizon: int):
 
         return {
             "status": "success",
+            "city": city,
             "predicted_aqi": round(pred, 2),
             "horizon": horizon,
             "model_name": model_doc["model_name"],
@@ -72,19 +79,22 @@ def predict_aqi(horizon: int):
             "status": "error",
             "message": str(e),
             "horizon": horizon,
+            "city": city,
         }
 
 
 # -------------------------------------------------
 # Multi-horizon prediction
 # -------------------------------------------------
-def predict_multi_aqi(horizons: List[int]):
+def predict_multi_aqi(horizons: List[int], city: str = "Karachi"):
+
     predictions = {}
 
     for h in horizons:
-        predictions[f"{h}h"] = predict_aqi(h)
+        predictions[f"{h}h"] = predict_aqi(horizon=h, city=city)
 
     return {
         "status": "success",
+        "city": city,
         "predictions": predictions,
     }
