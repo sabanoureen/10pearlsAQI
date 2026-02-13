@@ -22,8 +22,9 @@ dashboard_mode = st.sidebar.radio(
     ["Forecast Dashboard", "Model Comparison", "SHAP Analysis"]
 )
 
-st.sidebar.markdown("### 📍 Location")
-st.sidebar.info("Islamabad, Pakistan")
+location = "Karachi, Pakistan"   # or from API response
+st.markdown(location)
+
 
 forecast_days = st.sidebar.selectbox(
     "Forecast Horizon (Days)",

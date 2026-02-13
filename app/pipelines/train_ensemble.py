@@ -25,16 +25,13 @@ def train_ensemble(
     X_val,
     y_val,
     horizon: int,
-    run_id: str,
 ):
 
     print("🤝 Training Ensemble...")
 
     model = SimpleEnsemble([rf_model, xgb_model, gb_model])
 
-    # -------------------------------
-    # Validation Evaluation
-    # -------------------------------
+    # Validation
     preds = model.predict(X_val)
 
     rmse = float(np.sqrt(mean_squared_error(y_val, preds)))
@@ -43,35 +40,31 @@ def train_ensemble(
     print(f"Ensemble RMSE: {rmse:.2f}")
     print(f"Ensemble MAE : {mae:.2f}")
 
-    # -------------------------------
-    # Save Model (Versioned)
-    # -------------------------------
+    # Save model (stable path)
     model_dir = Path(f"models/ensemble_h{horizon}")
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    model_filename = f"ensemble_{run_id}.joblib"
-    model_path = model_dir / model_filename
+    model_path = model_dir / "model.joblib"
 
     joblib.dump(model, model_path)
 
-    # -------------------------------
-    # Register Model in Mongo
-    # -------------------------------
-    # -------------------------------
-# Register Model in Mongo
-# -------------------------------
+    print(f"✅ Ensemble saved to: {model_path}")
+
+    # Register in Mongo
     registry = get_model_registry()
 
     registry.insert_one({
-    "model_name": "random_forest",
-    "horizon": horizon,
-    "rmse": rmse,
-    "mae": mae,
-    "model_path": str(model_path),   # 🔥 important
-    "features": list(X_train.columns),  # 🔥 important
-    "status": "candidate",
-    "is_best": False,
-    "registered_at": datetime.utcnow()
+        "model_name": "ensemble",   # ✅ FIXED
+        "horizon": horizon,
+        "rmse": rmse,
+        "mae": mae,
+        "model_path": str(model_path),
+        "features": list(X_train.columns),
+        "status": "candidate",
+        "is_best": False,
+        "registered_at": datetime.utcnow()
     })
+
+    print("✅ Ensemble registered in MongoDB")
 
     return model, {"rmse": rmse, "mae": mae}

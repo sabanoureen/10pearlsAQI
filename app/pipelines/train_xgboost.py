@@ -8,7 +8,8 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error
 from app.db.mongo import get_model_registry
 
 
-def train_xgboost(X_train, y_train, X_val, y_val, horizon: int, run_id: str):
+def train_xgboost(X_train, y_train, X_val, y_val, horizon):
+
 
     print("⚡ Training XGBoost...")
 
