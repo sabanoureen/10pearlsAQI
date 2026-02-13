@@ -54,16 +54,16 @@ def train_ensemble(
     registry = get_model_registry()
 
     registry.insert_one({
-        "model_name": "ensemble",   # ✅ FIXED
-        "horizon": horizon,
-        "rmse": rmse,
-        "mae": mae,
-        "model_path": str(model_path),
-        "features": list(X_train.columns),
-        "status": "candidate",
-        "is_best": False,
-        "registered_at": datetime.utcnow()
-    })
+    "model_name": "ensemble",
+    "horizon": horizon,
+    "rmse": rmse,
+    "mae": mae,
+    "model_path": str(model_path),
+    "features": list(X_train.columns),
+    "status": "registered",   # ✅ changed
+    "is_best": False,
+    "registered_at": datetime.utcnow()
+})
 
     print("✅ Ensemble registered in MongoDB")
 

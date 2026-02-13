@@ -16,7 +16,6 @@ def train_xgboost(
     horizon: int
 ):
 
-
     print("⚡ Training XGBoost...")
 
     model = xgb.XGBRegressor(
@@ -43,15 +42,16 @@ def train_xgboost(
     print(f"XGB MAE : {mae:.2f}")
 
     # -------------------------------
-    # Save Model (Versioned)
+    # Save Model (Stable Path)
     # -------------------------------
     model_dir = Path(f"models/xgb_h{horizon}")
     model_dir.mkdir(parents=True, exist_ok=True)
 
-    model_filename = f"xgb_{run_id}.joblib"
-    model_path = model_dir / model_filename
+    model_path = model_dir / "model.joblib"
 
     joblib.dump(model, model_path)
+
+    print(f"✅ Model saved to: {model_path}")
 
     # -------------------------------
     # Register Model in Mongo
@@ -59,15 +59,17 @@ def train_xgboost(
     registry = get_model_registry()
 
     registry.insert_one({
-    "model_name": "random_forest",
-    "horizon": horizon,
-    "rmse": rmse,
-    "mae": mae,
-    "model_path": str(model_path),   # 🔥 important
-    "features": list(X_train.columns),  # 🔥 important
-    "status": "candidate",
-    "is_best": False,
-    "registered_at": datetime.utcnow()
+        "model_name": "xgboost",   # ✅ FIXED
+        "horizon": horizon,
+        "rmse": rmse,
+        "mae": mae,
+        "model_path": str(model_path),
+        "features": list(X_train.columns),
+        "status": "candidate",
+        "is_best": False,
+        "registered_at": datetime.utcnow()
     })
+
+    print("✅ XGBoost registered in Mongo")
 
     return model, {"rmse": rmse, "mae": mae}
