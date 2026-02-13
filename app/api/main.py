@@ -71,3 +71,22 @@ def shap_analysis():
 
     except Exception as e:
         return {"status": "error", "detail": str(e)}
+@app.get("/models/metrics")
+def get_model_metrics():
+    from app.db.mongo import get_model_registry
+
+    collection = get_model_registry()
+    models = list(collection.find({"status": "registered"}))
+
+    formatted = []
+    for m in models:
+        formatted.append({
+            "model_name": m["model_name"],
+            "rmse": m["rmse"],
+            "r2": m["r2"]
+        })
+
+    return {
+        "status": "success",
+        "models": formatted
+    }
