@@ -2,202 +2,252 @@ import streamlit as st
 import requests
 import pandas as pd
 import plotly.graph_objects as go
+import plotly.express as px
 
-# =========================================
-# CONFIG
-# =========================================
-API_URL = "https://10pearlsaqi-production-848d.up.railway.app"
-
+# ==============================
+# PAGE CONFIG
+# ==============================
 st.set_page_config(
     page_title="AQI Predictor Dashboard",
-    page_icon="🌍",
     layout="wide"
 )
 
-# =========================================
-# FUNCTIONS
-# =========================================
-def get_aqi_status(aqi):
-    if aqi <= 50:
-        return "Good", "green"
-    elif aqi <= 100:
-        return "Moderate", "gold"
-    elif aqi <= 150:
-        return "Unhealthy (Sensitive)", "orange"
-    elif aqi <= 200:
-        return "Unhealthy", "red"
-    else:
-        return "Hazardous", "purple"
+API_BASE_URL = "10pearlsaqi-production-848d.up.railway.app"  # 🔁 CHANGE THIS
 
-
-def fetch_model_metrics():
-    try:
-        res = requests.get(f"{API_URL}/models/metrics")
-        if res.status_code == 200:
-            return res.json()
-        return None
-    except:
-        return None
-
-
-# =========================================
+# ==============================
 # SIDEBAR
-# =========================================
-st.sidebar.title("⚙ Configuration")
+# ==============================
+st.sidebar.header("⚙️ Configuration")
 
-horizon = st.sidebar.selectbox(
+forecast_days = st.sidebar.selectbox(
     "Forecast Horizon (Days)",
-    [1, 3, 7],
-    index=1
+    [1, 2, 3, 5, 7],
+    index=2
 )
 
-st.sidebar.divider()
+st.sidebar.markdown("---")
 
 st.sidebar.subheader("About")
-
 st.sidebar.info(
     "This dashboard provides real-time AQI predictions "
-    "for the next few days using machine learning models."
+    "using multiple machine learning models."
 )
 
 st.sidebar.subheader("API Status")
-st.sidebar.success("API Connected")
 
-# =========================================
+try:
+    health = requests.get(f"{API_BASE_URL}/health").json()
+    st.sidebar.success("API Connected")
+except:
+    st.sidebar.error("API Not Connected")
+
+# ==============================
+# MAIN TITLE
+# ==============================
+st.title("🌍 AQI Predictor Dashboard")
+
+# ==============================
 # TABS
-# =========================================
-tab1, tab2 = st.tabs(["📊 Forecast", "🤖 Model Comparison"])
+# ==============================
+tab1, tab2, tab3 = st.tabs(
+    ["📊 Current & Forecast", "📈 Model Comparison", "🧠 SHAP Analysis"]
+)
 
-# =========================================
-# TAB 1 — FORECAST
-# =========================================
+# ============================================================
+# TAB 1 — CURRENT AQI + FORECAST
+# ============================================================
 with tab1:
-
-    st.title("🌍 AQI Predictor Dashboard")
 
     if st.button("Get Predictions"):
 
-        response = requests.get(f"{API_URL}/forecast/multi?days={horizon}")
+        try:
+            response = requests.get(
+                f"{API_BASE_URL}/predict?days={forecast_days}"
+            )
+            data = response.json()
 
-        if response.status_code != 200:
-            st.error("Failed to fetch forecast.")
+        except:
+            st.error("Failed to fetch prediction from API.")
             st.stop()
 
-        results = response.json()
+        if "forecast" not in data:
+            st.error("Invalid API response.")
+            st.stop()
 
-        df = pd.DataFrame(results["predictions"])
-        df["datetime"] = pd.to_datetime(df["datetime"])
-        df = df.sort_values("datetime")
+        forecast_df = pd.DataFrame(data["forecast"])
 
-        latest_aqi = df["predicted_aqi"].iloc[-1]
-        max_aqi = df["predicted_aqi"].max()
-        avg_aqi = df["predicted_aqi"].mean()
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("Latest AQI", round(forecast_df["aqi"].iloc[0], 2))
+        col2.metric("Max AQI", round(forecast_df["aqi"].max(), 2))
+        col3.metric("Average AQI", round(forecast_df["aqi"].mean(), 2))
+
+        latest_aqi = forecast_df["aqi"].iloc[0]
+
+        # AQI Status
+        def get_aqi_status(aqi):
+            if aqi <= 50:
+                return "Good", "green"
+            elif aqi <= 100:
+                return "Moderate", "orange"
+            elif aqi <= 150:
+                return "Unhealthy for Sensitive Groups", "darkorange"
+            elif aqi <= 200:
+                return "Unhealthy", "red"
+            elif aqi <= 300:
+                return "Very Unhealthy", "purple"
+            else:
+                return "Hazardous", "maroon"
 
         status, color = get_aqi_status(latest_aqi)
 
-        # KPIs
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Latest AQI", round(latest_aqi, 2))
-        col2.metric("Max AQI", round(max_aqi, 2))
-        col3.metric("Average AQI", round(avg_aqi, 2))
-
         st.markdown(
-            f"<h3 style='color:{color}'>Air Quality Status: {status}</h3>",
+            f"<h2 style='color:{color}'>Air Quality Status: {status}</h2>",
             unsafe_allow_html=True
         )
 
-        # Forecast Chart
-        fig = go.Figure()
-        fig.add_trace(
-            go.Scatter(
-                x=df["datetime"],
-                y=df["predicted_aqi"],
-                mode="lines+markers",
-                name="Forecast AQI"
-            )
+        # Forecast Trend
+        fig = px.line(
+            forecast_df,
+            x="timestamp",
+            y="aqi",
+            markers=True,
+            title="Forecast Trend"
         )
-
-        fig.update_layout(
-            template="plotly_white",
-            height=450
-        )
-
         st.plotly_chart(fig, use_container_width=True)
 
-    # =========================================
-    # AQI CATEGORY SECTION
-    # =========================================
-    st.divider()
     with st.expander("ℹ About AQI Categories"):
-
         st.markdown("""
-        - **Good (0-50)**: Air quality is satisfactory.  
-        - **Moderate (51-100)**: Acceptable for most people.  
-        - **Unhealthy for Sensitive Groups (101-150)**: Sensitive groups may experience health effects.  
-        - **Unhealthy (151-200)**: Everyone may begin to experience health effects.  
-        - **Very Unhealthy (201-300)**: Health alert for everyone.  
-        - **Hazardous (301+)**: Serious health warning for entire population.
+        - **Good (0-50)**: Air quality is satisfactory.
+        - **Moderate (51-100)**: Acceptable for most people.
+        - **Unhealthy for Sensitive Groups (101-150)**.
+        - **Unhealthy (151-200)**.
+        - **Very Unhealthy (201-300)**.
+        - **Hazardous (301+)**.
         """)
 
-# =========================================
+# ============================================================
 # TAB 2 — MODEL COMPARISON
-# =========================================
+# ============================================================
 with tab2:
 
-    st.title("🤖 Model Comparison")
+    try:
+        response = requests.get(f"{API_BASE_URL}/models")
+        models_data = response.json()
+    except:
+        st.warning("Unable to fetch model comparison data.")
+        st.stop()
 
-    metrics_data = fetch_model_metrics()
+    if "models" not in models_data:
+        st.warning("No model data returned.")
+        st.stop()
 
-    if metrics_data:
+    models_df = pd.DataFrame(models_data["models"])
 
-        models_df = pd.DataFrame(metrics_data["models"])
+    if models_df.empty:
+        st.warning("Model list is empty.")
+        st.stop()
 
-        # Highlight Best Model
-        best_model = models_df.sort_values("rmse").iloc[0]
+    # Normalize columns
+    models_df.columns = models_df.columns.str.lower()
 
-        st.success(
-            f"Best Model: {best_model['model_name']} "
-            f"(RMSE: {round(best_model['rmse'],2)}, "
-            f"R²: {round(best_model['r2'],2)})"
+    if "rmse" not in models_df.columns:
+        st.error("RMSE column not found in API.")
+        st.stop()
+
+    # Best model
+    best_model = models_df.sort_values("rmse").iloc[0]
+
+    st.success(
+        f"🏆 Best Model: {best_model['name']} "
+        f"(RMSE: {best_model['rmse']:.2f}, "
+        f"R²: {best_model.get('r2', 0):.3f})"
+    )
+
+    st.dataframe(models_df)
+
+    # RMSE Bar Chart
+    fig = px.bar(
+        models_df,
+        x="name",
+        y="rmse",
+        title="Model RMSE Comparison",
+        color="rmse"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+# ============================================================
+# TAB 3 — SHAP ANALYSIS
+# ============================================================
+with tab3:
+
+    try:
+        shap_response = requests.get(f"{API_BASE_URL}/shap")
+        shap_data = shap_response.json()
+    except:
+        st.warning("Unable to fetch SHAP data.")
+        st.stop()
+
+    if "shap_values" not in shap_data:
+        st.warning("SHAP values not available.")
+        st.stop()
+
+    shap_df = pd.DataFrame(shap_data["shap_values"])
+
+    shap_df = shap_df.sort_values(
+        by="value",
+        key=lambda x: abs(x),
+        ascending=False
+    ).head(5)
+
+    # Positive / Negative Coloring
+    shap_df["color"] = shap_df["value"].apply(
+        lambda x: "green" if x > 0 else "red"
+    )
+
+    # ==========================
+    # SHAP Bar Chart
+    # ==========================
+    fig_bar = go.Figure()
+
+    fig_bar.add_trace(
+        go.Bar(
+            x=shap_df["value"],
+            y=shap_df["feature"],
+            orientation="h",
+            marker_color=shap_df["color"]
         )
+    )
 
-        col1, col2 = st.columns(2)
-        col1.metric("Best R²", round(best_model["r2"], 3))
-        col2.metric("Best RMSE", round(best_model["rmse"], 2))
+    fig_bar.update_layout(
+        title="Top 5 Feature Impact on AQI",
+        xaxis_title="SHAP Value (Impact)",
+        yaxis_title="Feature"
+    )
 
-        # RMSE Comparison Chart
-        fig_rmse = go.Figure()
-        fig_rmse.add_trace(
-            go.Bar(
-                x=models_df["model_name"],
-                y=models_df["rmse"],
-                name="RMSE"
-            )
-        )
+    st.plotly_chart(fig_bar, use_container_width=True)
 
-        fig_rmse.update_layout(
-            title="RMSE Comparison",
-            template="plotly_white"
-        )
+    # ==========================
+    # WATERFALL STYLE
+    # ==========================
+    base_value = shap_data.get("base_value", 0)
 
-        st.plotly_chart(fig_rmse, use_container_width=True)
+    fig_waterfall = go.Figure(go.Waterfall(
+        name="SHAP Waterfall",
+        orientation="h",
+        measure=["absolute"] + ["relative"] * len(shap_df),
+        y=["Base Value"] + shap_df["feature"].tolist(),
+        x=[base_value] + shap_df["value"].tolist(),
+        connector={"line": {"color": "rgb(63, 63, 63)"}},
+    ))
 
-        # R2 Comparison Chart
-        fig_r2 = go.Figure()
-        fig_r2.add_trace(
-            go.Bar(
-                x=models_df["model_name"],
-                y=models_df["r2"],
-                name="R² Score"
-            )
-        )
+    fig_waterfall.update_layout(
+        title="Waterfall Explanation of AQI Prediction"
+    )
 
-        fig_r2.update_layout(
-            title="R² Comparison",
-            template="plotly_white"
-        )
+    st.plotly_chart(fig_waterfall, use_container_width=True)
 
-        st.plotly_chart(fig_r2, use_container_width=True)
+    final_prediction = base_value + shap_df["value"].sum()
 
-    else:
-        st.warning("Model metrics endpoint not available.")
+    st.success(f"Prediction Explained: {final_prediction:.2f}")
