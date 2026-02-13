@@ -17,13 +17,14 @@ def get_db():
         return _db
 
     MONGODB_URI = os.getenv("MONGODB_URI")
+
     if not MONGODB_URI:
         raise RuntimeError("MONGODB_URI not set")
 
-    MONGODB_URI = MONGODB_URI.strip()
-
     _client = MongoClient(MONGODB_URI)
     _db = _client["aqi_system"]
+
+    print("✅ Connected to MongoDB")
 
     return _db
 
@@ -31,10 +32,6 @@ def get_db():
 # -----------------------------------
 # Collection Accessors
 # -----------------------------------
-# -----------------------------------
-# Collection Accessors
-# -----------------------------------
-
 def get_feature_store():
     return get_db()["feature_store"]
 
@@ -42,6 +39,10 @@ def get_feature_store():
 def get_model_registry():
     return get_db()["model_registry"]
 
+
+# -----------------------------------
+# Load Feature Store as DataFrame
+# -----------------------------------
 def load_feature_store_df():
     collection = get_feature_store()
 
@@ -55,13 +56,11 @@ def load_feature_store_df():
     for doc in data:
         record = {}
 
-        # Add feature values
         if "features" in doc:
             record.update(doc["features"])
         else:
             record.update(doc)
 
-        # Add datetime column
         if "updated_at" in doc:
             record["datetime"] = doc["updated_at"]
 
@@ -72,7 +71,6 @@ def load_feature_store_df():
     if df.empty:
         raise RuntimeError("No valid feature records found")
 
-# ✅ ENSURE datetime column exists
     if "datetime" not in df.columns:
         df["datetime"] = pd.Timestamp.utcnow()
 
