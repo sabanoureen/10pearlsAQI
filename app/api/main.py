@@ -35,18 +35,25 @@ def shap_endpoint():
 
 @app.get("/models/metrics")
 def get_model_metrics():
+
     from app.db.mongo import get_model_registry
 
     collection = get_model_registry()
-    models = list(collection.find({"status": "registered"}))
+
+    models = list(
+        collection.find(
+            {"status": "registered"},
+            {"_id": 0}   # ✅ REMOVE ObjectId
+        )
+    )
 
     formatted = []
 
     for m in models:
         formatted.append({
-            "model_name": m["model_name"],
-            "rmse": m["rmse"],
-            "r2": m["r2"]
+            "model_name": m.get("model_name"),
+            "rmse": m.get("rmse"),
+            "r2": m.get("r2")
         })
 
     return {
