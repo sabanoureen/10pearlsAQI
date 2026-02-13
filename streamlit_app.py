@@ -12,7 +12,7 @@ st.set_page_config(
     layout="wide"
 )
 
-API_BASE_URL = "https://10pearlsaqi-production-848d.up.railway.app/api"  # 🔁 CHANGE THIS
+API_BASE_URL = "https://10pearlsaqi-production-848d.up.railway.app"
 
 # ==============================
 # SIDEBAR
@@ -36,25 +36,25 @@ st.sidebar.info(
 st.sidebar.subheader("API Status")
 
 try:
-    health = requests.get(f"{API_BASE_URL}/health").json()
-    st.sidebar.success("API Connected")
+    health = requests.get(f"{API_BASE_URL}/")
+    if health.status_code == 200:
+        st.sidebar.success("API Connected")
+    else:
+        st.sidebar.error("API Error")
 except:
     st.sidebar.error("API Not Connected")
 
 # ==============================
-# MAIN TITLE
+# TITLE
 # ==============================
 st.title("🌍 AQI Predictor Dashboard")
 
-# ==============================
-# TABS
-# ==============================
 tab1, tab2, tab3 = st.tabs(
     ["📊 Current & Forecast", "📈 Model Comparison", "🧠 SHAP Analysis"]
 )
 
 # ============================================================
-# TAB 1 — CURRENT AQI + FORECAST
+# TAB 1 — FORECAST
 # ============================================================
 with tab1:
 
@@ -62,19 +62,24 @@ with tab1:
 
         try:
             response = requests.get(
-                f"{API_BASE_URL}/predict?days={forecast_days}"
+                f"{API_BASE_URL}/forecast/multi?days={forecast_days}"
             )
+
+            if response.status_code != 200:
+                st.error("API returned error.")
+                st.stop()
+
             data = response.json()
 
         except:
             st.error("Failed to fetch prediction from API.")
             st.stop()
 
-        if "forecast" not in data:
+        if "predictions" not in data:
             st.error("Invalid API response.")
             st.stop()
 
-        forecast_df = pd.DataFrame(data["forecast"])
+        forecast_df = pd.DataFrame(data["predictions"])
 
         col1, col2, col3 = st.columns(3)
 
@@ -84,8 +89,7 @@ with tab1:
 
         latest_aqi = forecast_df["aqi"].iloc[0]
 
-        # AQI Status
-        def get_aqi_status(aqi):
+        def get_status(aqi):
             if aqi <= 50:
                 return "Good", "green"
             elif aqi <= 100:
@@ -99,14 +103,13 @@ with tab1:
             else:
                 return "Hazardous", "maroon"
 
-        status, color = get_aqi_status(latest_aqi)
+        status, color = get_status(latest_aqi)
 
         st.markdown(
             f"<h2 style='color:{color}'>Air Quality Status: {status}</h2>",
             unsafe_allow_html=True
         )
 
-        # Forecast Trend
         fig = px.line(
             forecast_df,
             x="timestamp",
@@ -114,114 +117,101 @@ with tab1:
             markers=True,
             title="Forecast Trend"
         )
+
         st.plotly_chart(fig, use_container_width=True)
 
     with st.expander("ℹ About AQI Categories"):
         st.markdown("""
-        - **Good (0-50)**: Air quality is satisfactory.
-        - **Moderate (51-100)**: Acceptable for most people.
-        - **Unhealthy for Sensitive Groups (101-150)**.
-        - **Unhealthy (151-200)**.
-        - **Very Unhealthy (201-300)**.
-        - **Hazardous (301+)**.
+        - **Good (0-50)**
+        - **Moderate (51-100)**
+        - **Unhealthy for Sensitive Groups (101-150)**
+        - **Unhealthy (151-200)**
+        - **Very Unhealthy (201-300)**
+        - **Hazardous (301+)**
         """)
 
 # ============================================================
-# TAB 2 — MODEL COMPARISON
+# TAB 2 — MODEL METRICS
 # ============================================================
 with tab2:
 
     try:
-        response = requests.get(f"{API_BASE_URL}/models")
-        models_data = response.json()
+        response = requests.get(f"{API_BASE_URL}/models/metrics")
+
+        if response.status_code != 200:
+            st.warning("Unable to fetch model metrics.")
+            st.stop()
+
+        data = response.json()
+
     except:
-        st.warning("Unable to fetch model comparison data.")
+        st.warning("Unable to fetch model metrics.")
         st.stop()
 
-    if "models" not in models_data:
+    if "models" not in data:
         st.warning("No model data returned.")
         st.stop()
 
-    models_df = pd.DataFrame(models_data["models"])
+    models_df = pd.DataFrame(data["models"])
 
     if models_df.empty:
-        st.warning("Model list is empty.")
+        st.warning("Model list empty.")
         st.stop()
 
-    # Normalize columns
-    models_df.columns = models_df.columns.str.lower()
-
-    if "rmse" not in models_df.columns:
-        st.error("RMSE column not found in API.")
-        st.stop()
-
-    # Best model
-    if "rmse" in models_df.columns:
-        best_model = models_df.sort_values("rmse").iloc[0]
-    else:
-        best_model = models_df.iloc[0]
-
+    best_model = models_df.sort_values("rmse").iloc[0]
 
     st.success(
-        f"🏆 Best Model: {best_model['name']} "
+        f"🏆 Best Model: {best_model['model_name']} "
         f"(RMSE: {best_model['rmse']:.2f}, "
-        f"R²: {best_model.get('r2', 0):.3f})"
+        f"R²: {best_model['r2']:.3f})"
     )
 
     st.dataframe(models_df)
 
-    # RMSE Bar Chart
     fig = px.bar(
         models_df,
-        x="name",
+        x="model_name",
         y="rmse",
-        title="Model RMSE Comparison",
+        title="RMSE Comparison",
         color="rmse"
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
 # ============================================================
-# TAB 3 — SHAP ANALYSIS
-# ============================================================
-# ============================================================
-# TAB 3 — SHAP ANALYSIS
+# TAB 3 — SHAP
 # ============================================================
 with tab3:
 
     try:
-        shap_response = requests.get(f"{API_BASE_URL}/forecast/shap")
-        shap_data = shap_response.json()
+        response = requests.get(f"{API_BASE_URL}/forecast/shap")
+
+        if response.status_code != 200:
+            st.warning("SHAP endpoint error.")
+            st.stop()
+
+        shap_data = response.json()
+
     except:
-        st.warning("Unable to fetch SHAP data.")
+        st.warning("Unable to fetch SHAP.")
         st.stop()
 
     if "contributions" not in shap_data:
-        st.warning("SHAP contributions not available.")
+        st.warning("SHAP data unavailable.")
         st.stop()
 
     shap_df = pd.DataFrame(shap_data["contributions"])
 
-    # Rename for consistency
-    shap_df = shap_df.rename(columns={
-        "shap_value": "value"
-    })
+    shap_df = shap_df.rename(columns={"shap_value": "value"})
 
-    # Sort by absolute impact
     shap_df = shap_df.reindex(
         shap_df["value"].abs().sort_values(ascending=False).index
     ).head(5)
 
-    # Color coding
     shap_df["color"] = shap_df["value"].apply(
         lambda x: "green" if x > 0 else "red"
     )
 
-    st.subheader("Top 5 Feature Impact on AQI")
-
-    # ----------------------
-    # BAR CHART
-    # ----------------------
     fig_bar = go.Figure()
 
     fig_bar.add_trace(
@@ -233,33 +223,15 @@ with tab3:
         )
     )
 
-    fig_bar.update_layout(
-        xaxis_title="SHAP Value (Impact)",
-        yaxis_title="Feature"
-    )
-
     st.plotly_chart(fig_bar, use_container_width=True)
 
-    # ----------------------
-    # WATERFALL
-    # ----------------------
-    base_value = shap_data.get("prediction", 0) - shap_df["value"].sum()
+    base_value = shap_data["prediction"] - shap_df["value"].sum()
 
     fig_waterfall = go.Figure(go.Waterfall(
-        name="SHAP Waterfall",
         orientation="h",
         measure=["absolute"] + ["relative"] * len(shap_df),
         y=["Base Value"] + shap_df["feature"].tolist(),
-        x=[base_value] + shap_df["value"].tolist(),
-        connector={"line": {"color": "gray"}},
+        x=[base_value] + shap_df["value"].tolist()
     ))
 
-    fig_waterfall.update_layout(
-        title="Waterfall Explanation of AQI Prediction"
-    )
-
     st.plotly_chart(fig_waterfall, use_container_width=True)
-
-    final_prediction = base_value + shap_df["value"].sum()
-
-    st.success(f"Prediction Explained: {final_prediction:.2f}")
