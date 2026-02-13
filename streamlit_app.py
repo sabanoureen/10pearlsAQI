@@ -12,7 +12,7 @@ st.set_page_config(
     layout="wide"
 )
 
-API_BASE_URL = "10pearlsaqi-production-848d.up.railway.app"  # 🔁 CHANGE THIS
+API_BASE_URL = "https://10pearlsaqi-production-848d.up.railway.app"  # 🔁 CHANGE THIS
 
 # ==============================
 # SIDEBAR
