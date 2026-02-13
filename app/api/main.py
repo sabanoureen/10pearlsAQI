@@ -76,16 +76,7 @@ def get_latest_forecast(horizon: int = 3):
 @app.get("/forecast/shap")
 def shap_analysis():
     try:
-        result = generate_shap_analysis()
-
-        return jsonable_encoder({
-            "status": "success",
-            "model_version": result["model_version"],
-            "generated_at": result["generated_at"],
-            "prediction": float(result["prediction"]),
-            "contributions": result["contributions"]
-        })
-
+        return generate_shap_analysis()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -96,19 +87,23 @@ def shap_analysis():
 @app.get("/models/metrics")
 def get_model_metrics():
     from app.db.mongo import get_model_registry
+    from fastapi.encoders import jsonable_encoder
 
     collection = get_model_registry()
-    models = list(collection.find({"status": "registered"}))
+
+    # Fetch production models
+    models = list(collection.find({"status": "production"}))
 
     formatted = []
     for m in models:
         formatted.append({
-            "name": m["model_name"],   # IMPORTANT: rename to name
-            "rmse": float(m["rmse"]),
-            "r2": float(m["r2"])
+            "model_name": m.get("model_name", "unknown"),
+            "rmse": float(m.get("rmse", 0)),
+            "r2": float(m.get("r2", 0)),
+            "horizon": m.get("horizon", 1)
         })
 
-    return {
+    return jsonable_encoder({
         "status": "success",
         "models": formatted
-    }
+    })

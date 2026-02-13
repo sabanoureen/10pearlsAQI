@@ -1,6 +1,7 @@
 import shap
 import pandas as pd
 from datetime import datetime
+from fastapi.encoders import jsonable_encoder
 
 from app.db.mongo import get_db
 from app.pipelines.load_production_model import load_production_model
@@ -10,29 +11,27 @@ def generate_shap_analysis():
 
     db = get_db()
 
-    # Load production model (1-day horizon)
+    # Load best production model (horizon 1)
     model, features, model_version = load_production_model(horizon=1)
 
     # Get latest feature row
-    latest_doc = list(
-        db["feature_store"]
-        .find()
-        .sort("datetime", -1)
-        .limit(1)
+    latest_doc = db["feature_store"].find_one(
+        sort=[("created_at", -1)]
     )
 
     if not latest_doc:
         raise RuntimeError("No feature data found for SHAP")
 
-    latest_doc = latest_doc[0]
-
+    # Build feature dataframe
     X = pd.DataFrame([{
-        col: latest_doc.get(col)
+        col: latest_doc.get(col, 0)
         for col in features
     }])
 
+    # Prediction
     prediction = float(model.predict(X)[0])
 
+    # SHAP explainer
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X)
 
@@ -50,9 +49,12 @@ def generate_shap_analysis():
         reverse=True
     )
 
-    return {
+    result = {
+        "status": "success",
         "model_version": model_version,
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.utcnow(),
         "prediction": prediction,
         "contributions": contributions
     }
+
+    return jsonable_encoder(result)
