@@ -95,19 +95,17 @@ def shap_analysis():
 # ==============================
 @app.get("/models/metrics")
 def get_model_metrics():
-
     from app.db.mongo import get_model_registry
 
     collection = get_model_registry()
     models = list(collection.find({"status": "registered"}))
 
     formatted = []
-
     for m in models:
         formatted.append({
-            "model_name": m.get("model_name"),
-            "rmse": float(m.get("rmse", 0)),
-            "r2": float(m.get("r2", 0))
+            "name": m["model_name"],   # IMPORTANT: rename to name
+            "rmse": float(m["rmse"]),
+            "r2": float(m["r2"])
         })
 
     return {
