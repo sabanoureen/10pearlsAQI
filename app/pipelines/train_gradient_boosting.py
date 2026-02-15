@@ -38,7 +38,7 @@ def train_gradient_boosting(X_train, y_train, X_val, y_val, horizon: int, run_id
         "horizon": horizon,
         "rmse": rmse,
         "mae": mae,
-        "model_binary": model_binary,
+        "model_path": str(model_path), 
         "features": list(X_train.columns),
         "status": "candidate",
         "is_best": False,

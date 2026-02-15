@@ -48,7 +48,7 @@ def train_ensemble(
         "horizon": horizon,
         "rmse": rmse,
         "mae": mae,
-        "model_binary": model_binary,
+        "model_path": str(model_path), 
         "features": list(X_train.columns),
         "status": "candidate",
         "is_best": False,

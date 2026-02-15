@@ -57,7 +57,7 @@ def train_xgboost(
         "horizon": horizon,
         "rmse": rmse,
         "mae": mae,
-        "model_path": str(model_path),
+        "model_path": str(model_path), 
         "features": list(X_train.columns),
         "status": "candidate",
         "is_best": False,

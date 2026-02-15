@@ -1,6 +1,6 @@
-import pickle
-import numpy as np
 from datetime import datetime
+import numpy as np
+import pickle
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
@@ -25,28 +25,28 @@ def train_random_forest(X_train, y_train, X_val, y_val, horizon: int, run_id: st
     mae = float(mean_absolute_error(y_val, preds))
     r2 = float(r2_score(y_val, preds))
 
-    print(f"RF RMSE: {rmse:.4f}")
-    print(f"RF MAE : {mae:.4f}")
-    print(f"RF R²  : {r2:.4f}")
+    print(f"RMSE: {rmse:.4f}")
 
-    # 🔥 Serialize model
+    # 🔥 Convert model to binary for Mongo storage
     model_binary = pickle.dumps(model)
 
+    # 🔥 NOW get registry (INSIDE FUNCTION)
     registry = get_model_registry()
 
-    registry.insert_one({
+    result = registry.insert_one({
         "model_name": "random_forest",
+        "run_id": run_id,
         "horizon": horizon,
         "rmse": rmse,
         "mae": mae,
         "r2": r2,
-        "model_binary": model_binary,  # 🔥 STORED IN MONGO
+        "model_path": str(model_path), 
         "features": list(X_train.columns),
         "status": "candidate",
         "is_best": False,
         "registered_at": datetime.utcnow()
     })
 
-    print("✅ Random Forest stored in MongoDB")
+    print("✅ Model stored in Mongo:", result.inserted_id)
 
     return model, {"rmse": rmse, "mae": mae, "r2": r2}
