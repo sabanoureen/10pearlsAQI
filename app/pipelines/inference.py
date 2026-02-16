@@ -63,8 +63,11 @@ def predict_aqi(horizon: int, city: str = "Karachi"):
         )
 
         # 3️⃣ Predict
-        pred = float(model.predict(X_last)[0])
+        pred_log = model.predict(X_last)[0]
+        pred = float(np.expm1(pred_log))
 
+# 🔥 Convert back to real PM2.5 scale
+        pred = float(np.expm1(log_pred))
         return {
             "status": "success",
             "city": city,

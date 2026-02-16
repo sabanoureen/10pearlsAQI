@@ -73,12 +73,14 @@ def get_latest_forecast(horizon: int = 3):
 # ==============================
 # SHAP ANALYSIS
 # ==============================
+
 @app.get("/forecast/shap")
-def shap_analysis():
+def shap_endpoint():
     try:
         return generate_shap_analysis()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"status": "error", "message": str(e)}
+
 
 
 # ==============================

@@ -1,39 +1,86 @@
 import shap
 import pandas as pd
+import numpy as np
 from datetime import datetime
-from fastapi.encoders import jsonable_encoder
 
-from app.db.mongo import get_db
+from app.db.mongo import get_db, get_model_registry   # 🔥 ADD THIS
 from app.pipelines.load_production_model import load_production_model
+from pathlib import Path
+import joblib   # ✅ ADD THIS
 
 
+
+
+
+# ==========================================================
+# SHAP ANALYSIS (Production Only)
+# ==========================================================
 def generate_shap_analysis():
 
     db = get_db()
+    registry = get_model_registry()
 
-    # Load best production model (horizon 1)
-    model, features, model_version = load_production_model(horizon=1)
+    # ------------------------------------------------------
+    # 1️⃣ Load Production Model (horizon=1)
+    # ------------------------------------------------------
+    model_doc = registry.find_one({
+        "horizon": 1,
+        "is_best": True
+    })
 
-    # Get latest feature row
-    latest_doc = db["feature_store"].find_one(
-        sort=[("created_at", -1)]
+    if not model_doc:
+        raise RuntimeError("No production model found for SHAP")
+
+    model_path = Path(model_doc["model_path"])
+
+    if not model_path.exists():
+        raise RuntimeError(f"Model file not found: {model_path}")
+
+    model = joblib.load(model_path)
+
+    features = model_doc["features"]
+
+    # ------------------------------------------------------
+    # 2️⃣ Get Latest Feature Row
+    # ------------------------------------------------------
+    latest_doc = list(
+        db["feature_store"]
+        .find()
+        .sort("datetime", -1)
+        .limit(1)
     )
 
     if not latest_doc:
-        raise RuntimeError("No feature data found for SHAP")
+        raise RuntimeError("No feature data available")
 
-    # Build feature dataframe
+    latest_doc = latest_doc[0]
+
     X = pd.DataFrame([{
-        col: latest_doc.get(col, 0)
+        col: latest_doc.get(col)
         for col in features
     }])
 
-    # Prediction
-    prediction = float(model.predict(X)[0])
+    X = X.fillna(0)
 
-    # SHAP explainer
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(X)
+    # ------------------------------------------------------
+    # 3️⃣ Prediction
+    # ------------------------------------------------------
+    prediction = float(model.predict(X)[0])
+    pred_log = model.predict(X)[0]
+    prediction = float(np.expm1(pred_log))
+
+
+    # ------------------------------------------------------
+    # 4️⃣ SHAP (Tree models only)
+    # ------------------------------------------------------
+    try:
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(X)
+
+    except Exception:
+        raise RuntimeError(
+            "SHAP only supported for tree-based models (RF, XGB, GB)"
+        )
 
     contributions = []
 
@@ -43,18 +90,17 @@ def generate_shap_analysis():
             "shap_value": float(value)
         })
 
+    # Sort by importance
     contributions = sorted(
         contributions,
         key=lambda x: abs(x["shap_value"]),
         reverse=True
     )
 
-    result = {
+    return {
         "status": "success",
-        "model_version": model_version,
-        "generated_at": datetime.utcnow(),
+        "model_name": model_doc["model_name"],
         "prediction": prediction,
+        "generated_at": datetime.utcnow().isoformat(),
         "contributions": contributions
     }
-
-    return jsonable_encoder(result)

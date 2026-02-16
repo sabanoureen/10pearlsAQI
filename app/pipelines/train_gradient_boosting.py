@@ -1,13 +1,20 @@
-import pickle
+from pathlib import Path
+import joblib
 import numpy as np
 from datetime import datetime
 from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 from app.db.mongo import get_model_registry
 
 
-def train_gradient_boosting(X_train, y_train, X_val, y_val, horizon: int, run_id: str
+def train_gradient_boosting(
+    X_train,
+    y_train,
+    X_val,
+    y_val,
+    horizon: int,
+    run_id: str
 ):
 
     print("🌊 Training Gradient Boosting...")
@@ -21,16 +28,47 @@ def train_gradient_boosting(X_train, y_train, X_val, y_val, horizon: int, run_id
 
     model.fit(X_train, y_train)
 
-    preds = model.predict(X_val)
+    # Predictions (log scale)
+    preds_log = model.predict(X_val)
 
-    rmse = float(np.sqrt(mean_squared_error(y_val, preds)))
-    mae = float(mean_absolute_error(y_val, preds))
+# Convert back to original scale
+    preds = np.expm1(preds_log)
+    y_true = np.expm1(y_val)
 
-    print(f"GB RMSE: {rmse:.4f}")
-    print(f"GB MAE : {mae:.4f}")
+    rmse = float(np.sqrt(mean_squared_error(y_true, preds)))
+    mae = float(mean_absolute_error(y_true, preds))
+    r2 = float(r2_score(y_true, preds))
 
-    model_binary = pickle.dumps(model)
+    print(f"RMSE: {rmse:.4f}")
+    print(f"MAE : {mae:.4f}")
+    print(f"R2  : {r2:.4f}")
 
+    # ===============================
+    # 🔎 Feature Importance (SAFE)
+    # ===============================
+    print("\n🔎 Top 10 Important Features:")
+
+    importances = model.feature_importances_
+    feature_names = X_train.columns
+
+    sorted_idx = np.argsort(importances)[::-1]
+
+    for i in sorted_idx[:10]:
+        print(f"{feature_names[i]} → {importances[i]:.4f}")
+
+    # ===============================
+    # Save Model
+    # ===============================
+    model_dir = Path(f"models/gbr_h{horizon}")
+    model_dir.mkdir(parents=True, exist_ok=True)
+
+    model_path = model_dir / f"model_{run_id}.joblib"
+
+    joblib.dump(model, model_path)
+
+    # ===============================
+    # Register Metadata
+    # ===============================
     registry = get_model_registry()
 
     registry.insert_one({
@@ -38,13 +76,13 @@ def train_gradient_boosting(X_train, y_train, X_val, y_val, horizon: int, run_id
         "horizon": horizon,
         "rmse": rmse,
         "mae": mae,
-        "model_path": str(model_path), 
+        "model_path": str(model_path),
         "features": list(X_train.columns),
         "status": "candidate",
         "is_best": False,
         "registered_at": datetime.utcnow()
     })
 
-    print("✅ Gradient Boosting stored in MongoDB")
+    print("✅ Gradient Boosting registered")
 
     return model, {"rmse": rmse, "mae": mae}

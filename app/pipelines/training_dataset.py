@@ -1,57 +1,51 @@
-"""
-Build Training Dataset
-----------------------
-Creates features and shifted target for multi-day forecast (hourly data)
-"""
-
 import pandas as pd
+import numpy as np
 from app.db.mongo import get_db
-
-from app.pipelines.aqi_calculation import add_aqi_column
 from app.pipelines.feature_engineering_time import add_time_features
 from app.pipelines.feature_engineering_lag import add_lag_features
 from app.pipelines.feature_engineering_rolling import add_rolling_features
 
 
+# -------------------------------------------------------
+# Load Historical Data
+# -------------------------------------------------------
 def load_historical_df():
+
     collection = get_db()["historical_hourly_data"]
     data = list(collection.find({}, {"_id": 0}))
 
     if not data:
-        raise RuntimeError("Historical data collection is empty")
+        raise RuntimeError("Historical data empty")
 
     return pd.DataFrame(data)
 
 
+# -------------------------------------------------------
+# Build Training Dataset
+# -------------------------------------------------------
 def build_training_dataset(horizon: int):
 
-    # ----------------------------------------
-    # 1️⃣ Load historical data
-    # ----------------------------------------
     df = load_historical_df()
-    print("Total historical rows:", len(df))
 
-    # ----------------------------------------
-    # 2️⃣ Datetime processing
-    # ----------------------------------------
+    # Datetime processing
     df["datetime"] = pd.to_datetime(df["datetime"])
     df = df.sort_values("datetime").reset_index(drop=True)
 
-    # ----------------------------------------
-    # 3️⃣ Remove missing pm2_5
-    # ----------------------------------------
+    # Remove missing pm2_5
     df = df.dropna(subset=["pm2_5"])
-    print("After dropping pm2_5 NaNs:", len(df))
 
-    # ----------------------------------------
-    # 4️⃣ AQI calculation
-    # ----------------------------------------
-    df = add_aqi_column(df)
-    df["aqi"] = df["aqi_pm25"]
+    # 🔥 Create TARGET FIRST (before log)
+    shift_hours = horizon * 24
+    df["target"] = df["pm2_5"].shift(-shift_hours)
 
-    # ----------------------------------------
-    # 5️⃣ Feature engineering (ONLY ONCE)
-    # ----------------------------------------
+    # Drop rows where future target is missing
+    df = df.dropna(subset=["target"]).reset_index(drop=True)
+
+    # 🔥 Apply log transform to BOTH feature + target
+    df["pm2_5"] = np.log1p(df["pm2_5"])
+    df["target"] = np.log1p(df["target"])
+
+    # Feature engineering
     df = add_time_features(df)
     df = add_lag_features(df)
     df = add_rolling_features(df)
@@ -59,29 +53,10 @@ def build_training_dataset(horizon: int):
     # Drop rows created by lag/rolling
     df = df.dropna().reset_index(drop=True)
 
-    print("Rows after feature engineering:", len(df))
+    # 🔥 REMOVE current pm2_5 from features (NO LEAKAGE)
+    drop_cols = ["datetime", "target", "pm2_5"]
 
-    # ----------------------------------------
-    # 6️⃣ Apply forecast shift
-    # ----------------------------------------
-    shift_hours = horizon * 24
-    print(f"📌 Shift applied: {shift_hours} hours")
-
-    df["target"] = df["aqi_pm25"].shift(-shift_hours)
-
-    df = df.dropna(subset=["target"]).reset_index(drop=True)
-
-    if df.empty:
-        raise RuntimeError("Dataset empty after shift. Not enough history.")
-
-    print("Rows after shift:", len(df))
-
-    # ----------------------------------------
-    # 7️⃣ Prepare X and y
-    # ----------------------------------------
-    drop_cols = ["target", "datetime", "pm2_5", "aqi_pm25"]
-
-    X = df.drop(columns=drop_cols, errors="ignore")
+    X = df.drop(columns=drop_cols)
     y = df["target"]
 
     return X, y
