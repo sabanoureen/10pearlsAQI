@@ -1,142 +1,98 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from datetime import datetime, timedelta
 from pathlib import Path
 import numpy as np
-import pandas as pd
 import joblib
-import shap
-import json
+import os
+
+from app.db.mongo import get_db, get_model_registry
 
 app = FastAPI(title="AQI Forecast API")
 
 
-# =====================================================
-# Utilities
-# =====================================================
+# ---------------------------------------------------
+# Health Check
+# ---------------------------------------------------
+@app.get("/")
+def health_check():
+    return {"status": "success", "message": "AQI API running"}
 
-MODEL_REGISTRY_PATH = Path("model_registry.json")
 
+# ---------------------------------------------------
+# Get Production Model
+# ---------------------------------------------------
+def load_production_model(horizon: int):
 
-def load_production_model():
-    if not MODEL_REGISTRY_PATH.exists():
-        raise RuntimeError("model_registry.json not found")
+    registry = get_model_registry()
 
-    with open(MODEL_REGISTRY_PATH, "r") as f:
-        registry = json.load(f)
+    model_doc = registry.find_one({
+        "horizon": horizon,
+        "is_best": True
+    })
 
-    production_model = None
+    if not model_doc:
+        raise HTTPException(status_code=404, detail="No production model found")
 
-    for model in registry:
-        if model.get("status") == "production":
-            production_model = model
-            break
+    model_path = model_doc["model_path"]
 
-    if not production_model:
-        raise RuntimeError("No production model found")
-
-    model_path = production_model["model_path"]
-    features = production_model["features"]
+    if not Path(model_path).exists():
+        raise HTTPException(status_code=500, detail="Model file not found")
 
     model = joblib.load(model_path)
 
-    return model, features, production_model
+    return model, model_doc["features"]
 
 
-from pymongo import MongoClient
-import os
+# ---------------------------------------------------
+# Get Latest Feature Row from Mongo
+# ---------------------------------------------------
+def get_latest_features(feature_columns):
 
-MONGO_URI = os.getenv("MONGO_URI")
-
-
-def load_latest_features(features):
-
-    if not MONGO_URI:
-        raise RuntimeError("MONGO_URI not set in environment")
-
-    client = MongoClient(MONGO_URI)
-    db = client.get_default_database()
-
+    db = get_db()
     collection = db["historical_hourly_data"]
 
-    # Load last 200 rows (for lag + rolling safety)
-    data = list(
-        collection.find({}, {"_id": 0})
-        .sort("datetime", -1)
-        .limit(200)
+    latest_doc = collection.find_one(
+        {},
+        sort=[("datetime", -1)]
     )
 
-    if not data:
-        raise RuntimeError("No historical data found")
+    if not latest_doc:
+        raise HTTPException(status_code=404, detail="No data found")
 
-    df = pd.DataFrame(data)
+    # Convert to feature vector
+    X = []
 
-    df["datetime"] = pd.to_datetime(df["datetime"])
-    df = df.sort_values("datetime")
+    for col in feature_columns:
+        X.append(latest_doc.get(col, 0))
 
-    # Same preprocessing as training
-    df = df.dropna(subset=["pm2_5"])
-    df["pm2_5"] = np.log1p(df["pm2_5"])
-
-    from app.pipelines.feature_engineering import (
-        add_time_features,
-        add_lag_features,
-        add_rolling_features,
-    )
-
-    df = add_time_features(df)
-    df = add_lag_features(df)
-    df = add_rolling_features(df)
-
-    df = df.dropna().reset_index(drop=True)
-
-    latest_row = df.tail(1)
-
-    return latest_row[features]
+    return np.array(X).reshape(1, -1)
 
 
-
-# =====================================================
-# Health Check
-# =====================================================
-
-@app.get("/")
-def health():
-    return {"status": "API running"}
-
-
-# =====================================================
-# Multi-Day Forecast
-# =====================================================
-
+# ---------------------------------------------------
+# Multi Forecast Endpoint
+# ---------------------------------------------------
 @app.get("/forecast/multi")
 def multi_forecast(horizon: int = 1):
 
     try:
-        model, features, meta = load_production_model()
-        X = load_latest_features(features)
+        model, features = load_production_model(horizon)
 
-        # Predict in log scale
-        preds_log = model.predict(X)
+        X_latest = get_latest_features(features)
 
-        # Convert back to real AQI
-        preds = np.expm1(preds_log)
+        # Model predicts log value
+        log_pred = model.predict(X_latest)[0]
 
-        results = []
+        # Convert back from log
+        prediction = float(np.expm1(log_pred))
 
-        for i in range(horizon):
-            future_time = datetime.utcnow() + timedelta(days=i + 1)
-
-            results.append({
-                "datetime": future_time,
-                "predicted_aqi": float(preds[0])
-            })
+        forecast_time = datetime.utcnow() + timedelta(days=horizon)
 
         return {
             "status": "success",
             "horizon": horizon,
             "generated_at": datetime.utcnow(),
-            "model_version": meta.get("model_name"),
-            "predictions": results
+            "prediction": prediction,
+            "forecast_for": forecast_time
         }
 
     except Exception as e:
@@ -146,63 +102,36 @@ def multi_forecast(horizon: int = 1):
         }
 
 
-# =====================================================
-# Latest Forecast (single day)
-# =====================================================
-
-@app.get("/forecast/latest")
-def latest_forecast():
-
-    try:
-        model, features, meta = load_production_model()
-        X = load_latest_features(features)
-
-        preds_log = model.predict(X)
-        preds = np.expm1(preds_log)
-
-        return {
-            "status": "success",
-            "prediction": float(preds[0]),
-            "generated_at": datetime.utcnow(),
-            "model_name": meta.get("model_name")
-        }
-
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }
-
-
-# =====================================================
-# SHAP Explainability
-# =====================================================
-
+# ---------------------------------------------------
+# SHAP Endpoint
+# ---------------------------------------------------
 @app.get("/forecast/shap")
-def shap_explain():
+def shap_explain(horizon: int = 1):
 
     try:
-        model, features, meta = load_production_model()
-        X = load_latest_features(features)
+        import shap
+
+        model, features = load_production_model(horizon)
+        X_latest = get_latest_features(features)
 
         explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(X)
+        shap_values = explainer.shap_values(X_latest)
 
         contributions = []
 
-        for feature, value in zip(features, shap_values[0]):
+        for i, feature in enumerate(features):
             contributions.append({
                 "feature": feature,
-                "shap_value": float(value)
+                "shap_value": float(shap_values[0][i])
             })
 
-        preds_log = model.predict(X)
-        preds = np.expm1(preds_log)
+        log_pred = model.predict(X_latest)[0]
+        prediction = float(np.expm1(log_pred))
 
         return {
             "status": "success",
-            "model_name": meta.get("model_name"),
-            "prediction": float(preds[0]),
+            "model_name": "production",
+            "prediction": prediction,
             "generated_at": datetime.utcnow(),
             "contributions": contributions
         }
@@ -214,27 +143,20 @@ def shap_explain():
         }
 
 
-# =====================================================
+# ---------------------------------------------------
 # Model Metrics
-# =====================================================
-
+# ---------------------------------------------------
 @app.get("/models/metrics")
-def model_metrics():
+def get_model_metrics():
 
-    try:
-        if not MODEL_REGISTRY_PATH.exists():
-            raise RuntimeError("model_registry.json missing")
+    registry = get_model_registry()
 
-        with open(MODEL_REGISTRY_PATH, "r") as f:
-            registry = json.load(f)
+    models = list(registry.find(
+        {"status": "production"},
+        {"_id": 0}
+    ))
 
-        return {
-            "status": "success",
-            "models": registry
-        }
-
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }
+    return {
+        "status": "success",
+        "models": models
+    }
