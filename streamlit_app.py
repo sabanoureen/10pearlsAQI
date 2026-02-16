@@ -7,7 +7,6 @@ import plotly.express as px
 # 🔥 CONFIG
 # ================================
 API_URL = "https://10pearlsaqi-production-848d.up.railway.app"
-
 st.set_page_config(page_title="AQI Dashboard", layout="wide")
 
 # ================================
