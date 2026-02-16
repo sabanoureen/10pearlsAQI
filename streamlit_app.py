@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 
 # ================================
-# 🔥 CONFIG
+# CONFIG
 # ================================
 API_URL = "https://10pearlsaqi-production-848d.up.railway.app"
 st.set_page_config(page_title="AQI Dashboard", layout="wide")
@@ -48,10 +48,9 @@ if page == "Forecast":
             data = response.json()
 
             if data.get("status") != "success":
-                st.error("API Error")
+                st.error(data.get("detail", "API Error"))
             else:
                 df = pd.DataFrame(data["predictions"])
-
                 df["datetime"] = pd.to_datetime(df["datetime"])
 
                 fig = px.line(
@@ -59,10 +58,15 @@ if page == "Forecast":
                     x="datetime",
                     y="predicted_aqi",
                     markers=True,
-                    title="AQI Forecast"
+                    title=f"{horizon}-Day AQI Forecast"
                 )
 
                 st.plotly_chart(fig, use_container_width=True)
+
+                st.metric(
+                    "Latest Predicted AQI",
+                    round(df["predicted_aqi"].iloc[-1], 2)
+                )
 
         except Exception as e:
             st.error(f"API Error: {e}")
@@ -83,14 +87,14 @@ elif page == "Model Comparison":
         else:
             df = pd.DataFrame(data["models"])
 
-            st.dataframe(df)
+            st.dataframe(df, use_container_width=True)
 
             fig = px.bar(
                 df,
-                x="model_name",
+                x="horizon",
                 y="rmse",
-                title="RMSE Comparison",
-                color="model_name"
+                color="model_name",
+                title="RMSE by Forecast Horizon"
             )
 
             st.plotly_chart(fig, use_container_width=True)
@@ -116,7 +120,7 @@ elif page == "SHAP Explainability":
             data = response.json()
 
             if data.get("status") != "success":
-                st.error("API Error")
+                st.error(data.get("detail", "API Error"))
             else:
                 contributions = pd.DataFrame(data["contributions"])
 

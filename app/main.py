@@ -79,20 +79,25 @@ def multi_forecast(horizon: int = 1):
 
         X_latest = get_latest_features(features)
 
-        # Model predicts log value
-        log_pred = model.predict(X_latest)[0]
+        predictions = []
 
-        # Convert back from log
-        prediction = float(np.expm1(log_pred))
+        base_time = datetime.utcnow()
 
-        forecast_time = datetime.utcnow() + timedelta(days=horizon)
+        for day in range(1, horizon + 1):
+
+            log_pred = model.predict(X_latest)[0]
+            pred = float(np.expm1(log_pred))
+
+            predictions.append({
+                "datetime": base_time + timedelta(days=day),
+                "predicted_aqi": pred
+            })
 
         return {
             "status": "success",
             "horizon": horizon,
             "generated_at": datetime.utcnow(),
-            "prediction": prediction,
-            "forecast_for": forecast_time
+            "predictions": predictions
         }
 
     except Exception as e:
@@ -100,7 +105,6 @@ def multi_forecast(horizon: int = 1):
             "status": "error",
             "message": str(e)
         }
-
 
 # ---------------------------------------------------
 # SHAP Endpoint

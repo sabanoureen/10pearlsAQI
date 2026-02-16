@@ -4,6 +4,7 @@ Generates recursive N-day forecast using production model
 """
 
 import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
 
 from app.db.mongo import get_db
@@ -14,8 +15,8 @@ def generate_multi_day_forecast(horizon: int = 3):
 
     db = get_db()
 
-    # 1️⃣ Load production model
-    model, features, model_version = load_production_model(horizon=1)
+    # 1️⃣ Load correct horizon model
+    model, features, model_version = load_production_model(horizon=horizon)
 
     # 2️⃣ Get latest feature row
     latest_doc = list(
@@ -31,32 +32,39 @@ def generate_multi_day_forecast(horizon: int = 3):
     latest_doc = latest_doc[0]
 
     current_features = {
-        col: latest_doc.get(col)
+        col: latest_doc.get(col, 0)
         for col in features
     }
 
     predictions = []
 
+    base_time = datetime.utcnow()
+
     # 3️⃣ Rolling forecast
     for step in range(1, horizon + 1):
 
         X = pd.DataFrame([current_features])
-        pred = float(model.predict(X)[0])
 
-        future_datetime = datetime.utcnow() + timedelta(days=step)
+        # Model predicts log(AQI)
+        log_pred = float(model.predict(X)[0])
+
+        # Inverse transform
+        pred = float(np.expm1(log_pred))
+
+        future_datetime = base_time + timedelta(days=step)
 
         predictions.append({
             "datetime": future_datetime,
             "predicted_aqi": pred
         })
 
-        # Shift lag features
-        lag_cols = [col for col in features if "lag" in col]
+        # 4️⃣ Shift lag features safely
+        lag_cols = [col for col in features if "_lag_" in col]
 
         if lag_cols:
             lag_cols_sorted = sorted(
                 lag_cols,
-                key=lambda x: int(x.split("_")[-1].replace("h", "")),
+                key=lambda x: int(x.split("_")[-1]),
                 reverse=True
             )
 
@@ -65,14 +73,14 @@ def generate_multi_day_forecast(horizon: int = 3):
 
             smallest_lag = sorted(
                 lag_cols,
-                key=lambda x: int(x.split("_")[-1].replace("h", ""))
+                key=lambda x: int(x.split("_")[-1])
             )[0]
 
             current_features[smallest_lag] = pred
 
     forecast_doc = {
         "horizon": horizon,
-        "generated_at": datetime.utcnow(),
+        "generated_at": base_time,
         "model_version": model_version,
         "predictions": predictions
     }
@@ -80,5 +88,3 @@ def generate_multi_day_forecast(horizon: int = 3):
     db["daily_forecast"].insert_one(forecast_doc)
 
     return forecast_doc
-
-
