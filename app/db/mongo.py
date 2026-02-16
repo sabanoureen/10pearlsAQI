@@ -1,3 +1,8 @@
+"""
+MongoDB connection and collection access
+Production-safe for Railway deployment
+"""
+
 import os
 from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError
@@ -6,6 +11,9 @@ _client = None
 _db = None
 
 
+# ======================================================
+# DB CONNECTION
+# ======================================================
 def get_db():
     global _client, _db
 
@@ -24,7 +32,7 @@ def get_db():
             serverSelectionTimeoutMS=5000
         )
 
-        # 🔎 Force connection check
+        # Force connection check
         _client.admin.command("ping")
 
         _db = _client[db_name]
@@ -35,26 +43,40 @@ def get_db():
         raise RuntimeError("MongoDB connection failed")
 
 
-# --------------------------------------------------
-# Collections
-# --------------------------------------------------
-
+# ======================================================
+# MODEL REGISTRY
+# ======================================================
 def get_model_registry():
     db = get_db()
     collection = db["model_registry"]
 
-    # Ensure index (one best model per horizon)
+    # Partial unique index:
+    # Only ONE production model per horizon
     collection.create_index(
-        [("horizon", 1), ("is_best", 1)],
-        unique=True
+        [("horizon", 1)],
+        unique=True,
+        partialFilterExpression={"is_best": True}
     )
 
     return collection
 
 
+# ======================================================
+# FEATURE STORE
+# ======================================================
 def get_feature_store():
     return get_db()["feature_store"]
 
 
+# ======================================================
+# HISTORICAL DATA
+# ======================================================
 def get_historical_data():
     return get_db()["historical_hourly_data"]
+
+
+# ======================================================
+# DAILY FORECASTS
+# ======================================================
+def get_daily_forecast():
+    return get_db()["daily_forecast"]
