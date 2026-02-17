@@ -22,7 +22,7 @@ def health_check():
 # ---------------------------------------------------
 def get_latest_model_file(horizon: int):
 
-    BASE_DIR = Path(__file__).resolve().parent.parent
+    BASE_DIR = Path(__file__).resolve().parents[2]
     model_dir = BASE_DIR / f"models/rf_h{horizon}"
 
     if not model_dir.exists():
@@ -33,10 +33,10 @@ def get_latest_model_file(horizon: int):
     if not model_files:
         raise HTTPException(500, f"No model files in {model_dir}")
 
-    # pick newest file
     latest_model = max(model_files, key=lambda f: f.stat().st_mtime)
 
     return latest_model
+
 
 
 # ---------------------------------------------------
@@ -53,8 +53,18 @@ def load_production_model(horizon: int):
         raise HTTPException(500, f"features.json missing in {model_path.parent}")
 
     import json
+
     with open(features_path) as f:
-        features = json.load(f)
+        data = json.load(f)
+
+    if isinstance(data, dict):
+        features = data.get("features") or data.get("feature_columns")
+    else:
+        features = data
+
+    if not features:
+        raise HTTPException(500, "Invalid features.json format")
+
 
     model = joblib.load(model_path)
 
