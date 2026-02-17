@@ -7,6 +7,8 @@ import json
 import pandas as pd
 
 from app.db.mongo import get_db
+from app.db.mongo import get_model_registry
+from app.pipelines.training_pipeline import run_training_pipeline
 
 app = FastAPI(title="AQI Forecast API")
 
@@ -47,27 +49,32 @@ def get_latest_model_file(horizon: int) -> Path:
 # LOAD MODEL + FEATURES
 # =========================================================
 def load_production_model(horizon: int):
-    model_path = get_latest_model_file(horizon)
 
-    features_path = model_path.parent / "features.json"
+    registry = get_model_registry()
+    doc = registry.find_one({"horizon": horizon, "is_best": True})
 
-    if not features_path.exists():
-        raise HTTPException(500, f"features.json missing in {model_path.parent}")
+    if not doc:
+        raise RuntimeError("No production model in Mongo")
 
-    with open(features_path) as f:
-        data = json.load(f)
+    model_path = doc["model_path"]
+    features = doc["features"]
 
-    if isinstance(data, dict):
-        features = data.get("features") or data.get("feature_columns")
-    else:
-        features = data
+    try:
+        model = joblib.load(model_path)
+        return model, features
 
-    if not features:
-        raise HTTPException(500, "Invalid features.json")
+    except Exception as e:
+        print("⚠️ Model load failed — retraining:", e)
 
-    model = joblib.load(model_path)
+        # retrain fresh model compatible with runtime
+        best = run_training_pipeline(horizon)
 
-    return model, features
+        doc = registry.find_one({"horizon": horizon, "is_best": True})
+        model_path = doc["model_path"]
+        features = doc["features"]
+
+        model = joblib.load(model_path)
+        return model, features
 
 
 # =========================================================

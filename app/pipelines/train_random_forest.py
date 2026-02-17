@@ -69,7 +69,7 @@ def train_random_forest(X_train, y_train, X_val, y_val, horizon: int, run_id: st
         "rmse": rmse,
         "mae": mae,
         "r2": r2,
-        "model_path": str(model_path),
+        "model_path": model_path.as_posix(),
         "features": list(X_train.columns),
         "status": "candidate",
         "is_best": False,
