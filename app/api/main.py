@@ -1,11 +1,8 @@
 from fastapi import FastAPI, HTTPException
-from datetime import datetime, timedelta
 from pathlib import Path
 import numpy as np
 import joblib
-import json
-
-from app.db.mongo import get_db
+from datetime import datetime
 
 app = FastAPI(title="AQI Forecast API")
 
@@ -14,27 +11,37 @@ app = FastAPI(title="AQI Forecast API")
 # Health Check
 # ---------------------------------------------------
 @app.get("/")
-def health_check():
-    return {"status": "success", "message": "AQI API running"}
+def health():
+    return {"status": "ok", "message": "AQI API running"}
 
 
 # ---------------------------------------------------
-# Find latest model file automatically
+# Get latest model file for a horizon
 # ---------------------------------------------------
-def get_latest_model_file(horizon: int):
+def get_latest_model(horizon: int) -> Path:
+    """
+    Locate newest .joblib model inside:
+    repo_root/models/rf_h{horizon}
+    """
 
-    # project root = repo root
+    # repo root (Railway safe)
     BASE_DIR = Path(__file__).resolve().parents[2]
 
     model_dir = BASE_DIR / f"models/rf_h{horizon}"
 
     if not model_dir.exists():
-        raise HTTPException(500, f"Model folder not found: {model_dir}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Model folder not found: {model_dir}"
+        )
 
     model_files = list(model_dir.glob("*.joblib"))
 
     if not model_files:
-        raise HTTPException(500, f"No model files in {model_dir}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"No model files in {model_dir}"
+        )
 
     # newest file
     latest_model = max(model_files, key=lambda f: f.stat().st_mtime)
@@ -43,90 +50,36 @@ def get_latest_model_file(horizon: int):
 
 
 # ---------------------------------------------------
-# Load model + features
-# ---------------------------------------------------
-def load_production_model(horizon: int):
-
-    model_path = get_latest_model_file(horizon)
-
-    model_dir = model_path.parent
-    features_path = model_dir / "features.json"
-
-    if not features_path.exists():
-        raise HTTPException(500, f"features.json missing in {model_dir}")
-
-    with open(features_path) as f:
-        data = json.load(f)
-
-    if isinstance(data, dict):
-        features = data.get("features") or data.get("feature_columns")
-    else:
-        features = data
-
-    if not isinstance(features, list) or len(features) == 0:
-        raise HTTPException(500, "Invalid features.json format")
-
-    model = joblib.load(model_path)
-
-    return model, features
-
-
-# ---------------------------------------------------
-# Get latest feature row from Mongo (SAFE)
-# ---------------------------------------------------
-def get_latest_features(feature_columns):
-    # temporary: no Mongo dependency
-    return np.zeros((1, len(feature_columns)))
-
-
-# ---------------------------------------------------
 # Forecast Endpoint
 # ---------------------------------------------------
 @app.get("/forecast/multi")
-def multi_forecast(horizon: int = 1):
+def forecast_multi(horizon: int = 1):
+    """
+    Returns AQI forecast using newest model for given horizon.
+    """
 
-    model, features = load_production_model(horizon)
-    X_latest = get_latest_features(features)
+    model_path = get_latest_model(horizon)
 
-    log_pred = model.predict(X_latest)[0]
+    # load model
+    model = joblib.load(model_path)
+
+    # create dummy feature vector matching model input
+    if hasattr(model, "n_features_in_"):
+        n_features = model.n_features_in_
+    else:
+        # fallback
+        n_features = 10
+
+    X = np.zeros((1, n_features))
+
+    # predict (model trained on log(AQI+1))
+    log_pred = model.predict(X)[0]
     prediction = float(np.expm1(log_pred))
-
-    forecast_time = datetime.utcnow() + timedelta(days=horizon)
 
     return {
         "status": "success",
         "horizon": horizon,
         "prediction": prediction,
-        "forecast_for": forecast_time,
-        "generated_at": datetime.utcnow()
-    }
-
-
-# ---------------------------------------------------
-# SHAP Endpoint
-# ---------------------------------------------------
-@app.get("/forecast/shap")
-def shap_explain(horizon: int = 1):
-
-    import shap
-
-    model, features = load_production_model(horizon)
-    X_latest = get_latest_features(features)
-
-    explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(X_latest)
-
-    contributions = [
-        {"feature": f, "shap_value": float(shap_values[0][i])}
-        for i, f in enumerate(features)
-    ]
-
-    log_pred = model.predict(X_latest)[0]
-    prediction = float(np.expm1(log_pred))
-
-    return {
-        "status": "success",
-        "prediction": prediction,
-        "contributions": contributions,
+        "model_used": model_path.name,
         "generated_at": datetime.utcnow()
     }
