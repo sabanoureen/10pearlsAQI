@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import joblib
 import json
+import pandas as pd
 
 from app.db.mongo import get_db
 
@@ -92,9 +93,13 @@ def get_latest_features(feature_columns):
 @app.get("/forecast/multi")
 def forecast_multi(horizon: int = 1):
     model, features = load_production_model(horizon)
-    X = get_latest_features(features)
+    X_latest = get_latest_features(features)
 
-    log_pred = model.predict(X)[0]
+# FIX: align columns with training
+    X_latest = pd.DataFrame(X_latest, columns=features)
+
+    log_pred = model.predict(X_latest)[0]
+
     pred = float(np.expm1(log_pred))
 
     return {
@@ -114,7 +119,9 @@ def shap_explain(horizon: int = 1):
     import shap
 
     model, features = load_production_model(horizon)
-    X = get_latest_features(features)
+    X_latest= get_latest_features(features)
+    X_latest = pd.DataFrame(X_latest, columns=features)
+
 
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(X)
