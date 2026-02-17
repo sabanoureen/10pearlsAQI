@@ -112,8 +112,15 @@ def multi_forecast(horizon: int = 1):
             "generated_at": datetime.utcnow()
         }
 
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 # =====================================================
