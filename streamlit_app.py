@@ -6,7 +6,8 @@ import plotly.express as px
 # ================================
 # CONFIG
 # ================================
-API_URL = "https://10pearlsaqi-production-848d.up.railway.app"
+API_URL = "https://alert-cat-production.up.railway.app"
+
 st.set_page_config(page_title="AQI Dashboard", layout="wide")
 
 # ================================
@@ -22,128 +23,46 @@ horizon = st.sidebar.selectbox(
 
 page = st.sidebar.radio(
     "Navigation",
-    ["Forecast", "Model Comparison", "SHAP Explainability"]
+    ["Forecast"]
 )
 
 # ================================
 # TITLE
 # ================================
-st.title("🌍 AQI Forecast & Explainability Dashboard")
+st.title("🌍 AQI Forecast Dashboard")
 
 # ============================================================
-# 1️⃣ FORECAST PAGE
+# FORECAST PAGE
 # ============================================================
 if page == "Forecast":
 
-    st.header("📈 AQI Multi-Day Forecast")
+    st.header("📈 AQI Forecast")
 
     if st.button("Generate Forecast"):
 
         try:
             response = requests.get(
                 f"{API_URL}/forecast/multi",
-                params={"horizon": horizon}
+                params={"horizon": horizon},
+                timeout=30
             )
 
             data = response.json()
 
             if data.get("status") != "success":
-                st.error(data.get("detail", "API Error"))
+                st.error(data)
             else:
-                df = pd.DataFrame(data["predictions"])
-                df["datetime"] = pd.to_datetime(df["datetime"])
+                prediction = data["prediction"]
+                forecast_for = data["forecast_for"]
 
-                fig = px.line(
-                    df,
-                    x="datetime",
-                    y="predicted_aqi",
-                    markers=True,
-                    title=f"{horizon}-Day AQI Forecast"
-                )
-
-                st.plotly_chart(fig, use_container_width=True)
-
-                st.metric(
-                    "Latest Predicted AQI",
-                    round(df["predicted_aqi"].iloc[-1], 2)
-                )
-
-        except Exception as e:
-            st.error(f"API Error: {e}")
-
-# ============================================================
-# 2️⃣ MODEL COMPARISON
-# ============================================================
-elif page == "Model Comparison":
-
-    st.header("📊 Model Performance")
-
-    try:
-        response = requests.get(f"{API_URL}/models/metrics")
-        data = response.json()
-
-        if data.get("status") != "success":
-            st.error("API Error")
-        else:
-            df = pd.DataFrame(data["models"])
-
-            st.dataframe(df, use_container_width=True)
-
-            fig = px.bar(
-                df,
-                x="horizon",
-                y="rmse",
-                color="model_name",
-                title="RMSE by Forecast Horizon"
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
-
-    except Exception as e:
-        st.error(f"API Error: {e}")
-
-# ============================================================
-# 3️⃣ SHAP PAGE
-# ============================================================
-elif page == "SHAP Explainability":
-
-    st.header("🧠 SHAP Explainability")
-
-    if st.button("Generate SHAP Explanation"):
-
-        try:
-            response = requests.get(
-                f"{API_URL}/forecast/shap",
-                params={"horizon": horizon}
-            )
-
-            data = response.json()
-
-            if data.get("status") != "success":
-                st.error(data.get("detail", "API Error"))
-            else:
-                contributions = pd.DataFrame(data["contributions"])
-
-                contributions = contributions.sort_values(
-                    by="shap_value",
-                    key=abs,
-                    ascending=False
-                )
-
-                fig = px.bar(
-                    contributions.head(15),
-                    x="shap_value",
-                    y="feature",
-                    orientation="h",
-                    title="Top SHAP Feature Contributions"
-                )
-
-                st.plotly_chart(fig, use_container_width=True)
+                st.success("Forecast generated")
 
                 st.metric(
                     "Predicted AQI",
-                    round(data["prediction"], 2)
+                    round(prediction, 2)
                 )
+
+                st.write(f"Forecast For: {forecast_for}")
 
         except Exception as e:
             st.error(f"API Error: {e}")
