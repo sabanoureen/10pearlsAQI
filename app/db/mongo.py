@@ -1,82 +1,71 @@
-"""
-MongoDB connection and collection access
-Production-safe for Railway deployment
-"""
-
-import os
 from pymongo import MongoClient
-from pymongo.errors import ServerSelectionTimeoutError
+from datetime import datetime
 
-_client = None
-_db = None
+client = MongoClient("mongodb+srv://saba31860_db_user:3LZwwTVy1yMFvzjD@cluster0.zpezyti.mongodb.net/aqi_system?retryWrites=true&w=majority")
+db = client["aqi_system"]
+registry = db["model_registry"]
 
+features = [
+    "pm10","carbon_monoxide","nitrogen_dioxide","sulphur_dioxide","ozone",
+    "hour","day_of_week","day_of_month","month","week_of_year",
+    "hour_sin","hour_cos","dow_sin","dow_cos",
+    "pm2_5_lag_1","pm2_5_lag_6","pm2_5_lag_12","pm2_5_lag_24",
+    "pm2_5_lag_48","pm2_5_lag_72","pm2_5_lag_168",
+    "pm2_5_roll_mean_6","pm2_5_roll_std_6",
+    "pm2_5_roll_mean_12","pm2_5_roll_std_12",
+    "pm2_5_roll_mean_24","pm2_5_roll_std_24",
+    "pm2_5_roll_mean_48"
+]
 
-# ======================================================
-# DB CONNECTION
-# ======================================================
-def get_db():
-    global _client, _db
+docs = [
+    {
+        "model_name": "random_forest",
+        "horizon": 1,
+        "status": "production",
+        "is_best": True,
+        "model_path": "models/rf_model_h1.joblib",
+        "features": features,
+        "model_version": "rf_h1_v1",
+        "created_at": datetime.utcnow()
+    },
+    {
+        "model_name": "random_forest",
+        "horizon": 3,
+        "status": "production",
+        "is_best": True,
+        "model_path": "models/rf_model_h3.joblib",
+        "features": features,
+        "model_version": "rf_h3_v1",
+        "created_at": datetime.utcnow()
+    },
+    {
+        "model_name": "random_forest",
+        "horizon": 5,
+        "status": "production",
+        "is_best": True,
+        "model_path": "models/rf_model_h5.joblib",
+        "features": features,
+        "model_version": "rf_h5_v1",
+        "created_at": datetime.utcnow()
+    }
+]
 
-    if _db is not None:
-        return _db
+for d in docs:
+    registry.update_one(
+    {"horizon": 3, "is_best": True},
+    {"$set": {"model_path": "models/rf_h3/model.joblib"}}
+)
 
-    mongo_uri = os.getenv("MONGODB_URI")
-    db_name = os.getenv("MONGODB_DB", "aqi_system")
+registry.update_one(
+    {"horizon": 1, "is_best": True},
+    {"$set": {"model_path": "models/rf_h1/model.joblib"}}
+)
 
-    if not mongo_uri:
-        raise RuntimeError("MONGODB_URI not set")
+registry.update_one(
+    {"horizon": 5, "is_best": True},
+    {"$set": {"model_path": "models/rf_h5/model.joblib"}}
+)
 
-    try:
-        _client = MongoClient(
-            mongo_uri,
-            serverSelectionTimeoutMS=5000
-        )
+print("paths updated")
 
-        # Force connection check
-        _client.admin.command("ping")
-
-        _db = _client[db_name]
-
-        return _db
-
-    except ServerSelectionTimeoutError:
-        raise RuntimeError("MongoDB connection failed")
-
-
-# ======================================================
-# MODEL REGISTRY
-# ======================================================
-def get_model_registry():
-    db = get_db()
-    collection = db["model_registry"]
-
-    # Partial unique index:
-    # Only ONE production model per horizon
-    collection.create_index(
-        [("horizon", 1)],
-        unique=True,
-        partialFilterExpression={"is_best": True}
-    )
-
-    return collection
-
-
-# ======================================================
-# FEATURE STORE
-# ======================================================
-def get_feature_store():
-    return get_db()["feature_store"]
-
-
-# ======================================================
-# HISTORICAL DATA
-# ======================================================
-def get_historical_data():
-    return get_db()["historical_hourly_data"]
-
-
-# ======================================================
-# DAILY FORECASTS
-# ======================================================
-def get_daily_forecast():
-    return get_db()["daily_forecast"]
+print("✅ Production models registered")

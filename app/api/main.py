@@ -1,111 +1,162 @@
 from fastapi import FastAPI, HTTPException
-from datetime import datetime
-from fastapi.encoders import jsonable_encoder
+from datetime import datetime, timedelta
+from pathlib import Path
+import numpy as np
+import joblib
+import os
 
-from app.db.mongo import get_db
-from app.pipelines.predict_multi_day import generate_multi_day_forecast
-from app.pipelines.shap_analysis import generate_shap_analysis
+from app.db.mongo import get_db, get_model_registry
 
-app = FastAPI(
-    title="AQI Forecast API",
-    description="Multi-day AQI forecasting service",
-    version="4.0"
-)
+app = FastAPI(title="AQI Forecast API")
 
 
-# ==============================
-# ROOT HEALTH
-# ==============================
+# ---------------------------------------------------
+# Health Check
+# ---------------------------------------------------
 @app.get("/")
 def health_check():
-    return {
-        "status": "ok",
-        "message": "AQI Forecast API running",
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    return {"status": "success", "message": "AQI API running"}
 
 
-# ==============================
-# MULTI-DAY FORECAST
-# ==============================
+# ---------------------------------------------------
+# Get Production Model
+# ---------------------------------------------------
+def load_production_model(horizon: int):
+
+    registry = get_model_registry()
+
+    model_doc = registry.find_one({
+        "horizon": horizon,
+        "is_best": True
+    })
+
+    if not model_doc:
+        raise HTTPException(status_code=404, detail="No production model found")
+
+    model_path = model_doc["model_path"]
+
+    if not Path(model_path).exists():
+        raise HTTPException(status_code=500, detail="Model file not found")
+
+    model = joblib.load(model_path)
+
+    return model, model_doc["features"]
+
+
+# ---------------------------------------------------
+# Get Latest Feature Row from Mongo
+# ---------------------------------------------------
+def get_latest_features(feature_columns):
+
+    db = get_db()
+    collection = db["historical_hourly_data"]
+
+    latest_doc = collection.find_one(
+        {},
+        sort=[("datetime", -1)]
+    )
+
+    if not latest_doc:
+        raise HTTPException(status_code=404, detail="No data found")
+
+    # Convert to feature vector
+    X = []
+
+    for col in feature_columns:
+        X.append(latest_doc.get(col, 0))
+
+    return np.array(X).reshape(1, -1)
+
+
+# ---------------------------------------------------
+# Multi Forecast Endpoint
+# ---------------------------------------------------
 @app.get("/forecast/multi")
-def multi_forecast(days: int = 3):
+def multi_forecast(horizon: int = 1):
+
     try:
-        result = generate_multi_day_forecast(days)
+        model, features = load_production_model(horizon)
+
+        X_latest = get_latest_features(features)
+
+        # Model predicts log value
+        log_pred = model.predict(X_latest)[0]
+
+        # Convert back from log
+        prediction = float(np.expm1(log_pred))
+
+        forecast_time = datetime.utcnow() + timedelta(days=horizon)
 
         return {
             "status": "success",
-            "horizon": days,
-            "generated_at": result["generated_at"],
-            "model_version": result["model_version"],
-            "predictions": result["predictions"]
+            "horizon": horizon,
+            "generated_at": datetime.utcnow(),
+            "prediction": prediction,
+            "forecast_for": forecast_time
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 
 
-# ==============================
-# LATEST FORECAST
-# ==============================
-@app.get("/forecast/latest")
-def get_latest_forecast(horizon: int = 3):
+# ---------------------------------------------------
+# SHAP Endpoint
+# ---------------------------------------------------
+@app.get("/forecast/shap")
+def shap_explain(horizon: int = 1):
 
-    db = get_db()
+    try:
+        import shap
 
-    doc = db["daily_forecast"].find_one(
-        {"horizon": horizon},
-        sort=[("generated_at", -1)]
-    )
+        model, features = load_production_model(horizon)
+        X_latest = get_latest_features(features)
 
-    if not doc:
-        raise HTTPException(status_code=404, detail="No forecast found")
+        explainer = shap.TreeExplainer(model)
+        shap_values = explainer.shap_values(X_latest)
+
+        contributions = []
+
+        for i, feature in enumerate(features):
+            contributions.append({
+                "feature": feature,
+                "shap_value": float(shap_values[0][i])
+            })
+
+        log_pred = model.predict(X_latest)[0]
+        prediction = float(np.expm1(log_pred))
+
+        return {
+            "status": "success",
+            "model_name": "production",
+            "prediction": prediction,
+            "generated_at": datetime.utcnow(),
+            "contributions": contributions
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+# ---------------------------------------------------
+# Model Metrics
+# ---------------------------------------------------
+@app.get("/models/metrics")
+def get_model_metrics():
+
+    registry = get_model_registry()
+
+    models = list(registry.find(
+        {"status": "production"},
+        {"_id": 0}
+    ))
 
     return {
         "status": "success",
-        "horizon": int(doc["horizon"]),
-        "generated_at": str(doc["generated_at"]),
-        "model_version": doc.get("model_version", "unknown"),
-        "predictions": doc["predictions"]
+        "models": models
     }
-
-
-# ==============================
-# SHAP ANALYSIS
-# ==============================
-
-@app.get("/forecast/shap")
-def shap_endpoint():
-    try:
-        return generate_shap_analysis()
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-
-# ==============================
-# MODEL METRICS
-# ==============================
-@app.get("/models/metrics")
-def get_model_metrics():
-    from app.db.mongo import get_model_registry
-    from fastapi.encoders import jsonable_encoder
-
-    collection = get_model_registry()
-
-    # Fetch production models
-    models = list(collection.find({"status": "production"}))
-
-    formatted = []
-    for m in models:
-        formatted.append({
-            "model_name": m.get("model_name", "unknown"),
-            "rmse": float(m.get("rmse", 0)),
-            "r2": float(m.get("r2", 0)),
-            "horizon": m.get("horizon", 1)
-        })
-
-    return jsonable_encoder({
-        "status": "success",
-        "models": formatted
-    })
