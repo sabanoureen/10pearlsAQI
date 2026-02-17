@@ -60,7 +60,8 @@ def get_latest_features(columns):
 # ---------------------------------------------------
 @app.get("/forecast/multi")
 def forecast_multi(horizon: int = 1):
-    model, features = load_production_model(horizon)
+    model, features, _ = load_production_model(horizon)
+
     X = get_latest_features(features)
 
     preds = []
@@ -90,7 +91,8 @@ def forecast_multi(horizon: int = 1):
 def shap_explain(horizon: int = 1):
     import shap
 
-    model, features = load_production_model(horizon)
+    model, features, _ = load_production_model(horizon)
+
     X = get_latest_features(features)
 
     explainer = shap.TreeExplainer(model)
@@ -140,7 +142,8 @@ def best_model():
 # ---------------------------------------------------
 @app.get("/features/importance")
 def importance(horizon: int = 1):
-    model, features = load_production_model(horizon)
+    model, features, _ = load_production_model(horizon)
+
 
     if not hasattr(model, "feature_importances_"):
         return {"status": "error", "detail": "No importance"}
