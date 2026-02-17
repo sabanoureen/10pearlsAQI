@@ -164,3 +164,60 @@ def get_model_metrics():
         "status": "success",
         "models": models
     }
+@app.get("/models/metrics")
+def get_model_metrics():
+    registry = get_model_registry()
+    docs = list(registry.find({}, {"_id": 0}))
+
+    if not docs:
+        return {"status": "error", "detail": "No models found"}
+
+    return {"status": "success", "models": docs}
+@app.get("/models/best")
+def get_best_model():
+    registry = get_model_registry()
+    doc = registry.find_one({"is_best": True}, {"_id": 0})
+
+    if not doc:
+        return {"status": "error", "detail": "No best model"}
+
+    return {"status": "success", "model": doc}
+@app.get("/features/importance")
+def feature_importance(horizon: int = 1):
+    model, features = load_production_model(horizon)
+
+    if not hasattr(model, "feature_importances_"):
+        return {"status": "error", "detail": "Model has no importance"}
+
+    importance = model.feature_importances_
+
+    data = [
+        {"feature": f, "importance": float(i)}
+        for f, i in zip(features, importance)
+    ]
+
+    return {"status": "success", "features": data}
+import shap
+import numpy as np
+
+@app.get("/forecast/shap")
+def shap_explain(horizon: int = 1):
+    model, features = load_production_model(horizon)
+
+    X_latest = get_latest_features(features)  # you already use this in forecast
+
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(X_latest)
+
+    contributions = [
+        {"feature": f, "shap_value": float(v)}
+        for f, v in zip(features, shap_values[0])
+    ]
+
+    pred = float(model.predict(X_latest)[0])
+
+    return {
+        "status": "success",
+        "prediction": pred,
+        "contributions": contributions
+    }
