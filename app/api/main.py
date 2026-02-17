@@ -10,53 +10,48 @@ from app.db.mongo import get_db
 app = FastAPI(title="AQI Forecast API")
 
 
-# =====================================================
-# CONFIG
-# =====================================================
+# =========================================================
+# HEALTH
+# =========================================================
+@app.get("/")
+def health():
+    return {"status": "ok", "message": "AQI API running"}
+
+
+# =========================================================
+# MODEL PATH RESOLVER (SAFE)
+# =========================================================
 BASE_DIR = Path(__file__).resolve().parents[2]
 MODELS_DIR = BASE_DIR / "models"
 
 
-# =====================================================
-# HEALTH CHECK
-# =====================================================
-@app.get("/")
-def health_check():
-    return {"status": "ok", "message": "AQI API running"}
-
-
-# =====================================================
-# FIND LATEST MODEL FILE
-# =====================================================
 def get_latest_model_file(horizon: int) -> Path:
     """
-    Finds latest .joblib file inside models/*_h{horizon}/
-    Example: models/rf_h1/model_*.joblib
+    Returns latest joblib file inside models/rf_h{horizon}
     """
-    candidates = list(MODELS_DIR.glob(f"*h{horizon}/*.joblib"))
+    folder = MODELS_DIR / f"rf_h{horizon}"
 
-    if not candidates:
-        raise HTTPException(
-            status_code=500,
-            detail=f"No model found for horizon {horizon} in {MODELS_DIR}"
-        )
+    if not folder.exists():
+        raise HTTPException(500, f"Model folder missing: {folder}")
 
-    latest = max(candidates, key=lambda p: p.stat().st_mtime)
-    return latest
+    files = sorted(folder.glob("*.joblib"))
+
+    if not files:
+        raise HTTPException(500, f"No model files in {folder}")
+
+    return files[-1]
 
 
-# =====================================================
+# =========================================================
 # LOAD MODEL + FEATURES
-# =====================================================
+# =========================================================
 def load_production_model(horizon: int):
     model_path = get_latest_model_file(horizon)
+
     features_path = model_path.parent / "features.json"
 
     if not features_path.exists():
-        raise HTTPException(
-            status_code=500,
-            detail=f"features.json missing in {model_path.parent}"
-        )
+        raise HTTPException(500, f"features.json missing in {model_path.parent}")
 
     with open(features_path) as f:
         data = json.load(f)
@@ -74,83 +69,65 @@ def load_production_model(horizon: int):
     return model, features
 
 
-# =====================================================
+# =========================================================
 # GET LATEST FEATURES FROM MONGO
-# =====================================================
+# =========================================================
 def get_latest_features(feature_columns):
     db = get_db()
-    collection = db["historical_hourly_data"]
+    col = db["historical_hourly_data"]
 
-    latest_doc = collection.find_one({}, sort=[("datetime", -1)])
+    doc = col.find_one({}, sort=[("datetime", -1)])
 
-    if not latest_doc:
-        raise HTTPException(500, "No historical data in Mongo")
+    if not doc:
+        raise HTTPException(404, "No historical data found")
 
-    X = [latest_doc.get(col, 0) for col in feature_columns]
+    X = [doc.get(c, 0) for c in feature_columns]
+
     return np.array(X).reshape(1, -1)
 
 
-# =====================================================
-# FORECAST ENDPOINT
-# =====================================================
+# =========================================================
+# FORECAST
+# =========================================================
 @app.get("/forecast/multi")
-def multi_forecast(horizon: int = 1):
-    try:
-        model, features = load_production_model(horizon)
-        X_latest = get_latest_features(features)
+def forecast_multi(horizon: int = 1):
+    model, features = load_production_model(horizon)
+    X = get_latest_features(features)
 
-        log_pred = model.predict(X_latest)[0]
-        prediction = float(np.expm1(log_pred))
+    log_pred = model.predict(X)[0]
+    pred = float(np.expm1(log_pred))
 
-        forecast_time = datetime.utcnow() + timedelta(days=horizon)
-
-        return {
-            "status": "success",
-            "horizon": horizon,
-            "prediction": prediction,
-            "forecast_for": forecast_time,
-            "generated_at": datetime.utcnow()
-        }
-
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {
+        "status": "success",
+        "horizon": horizon,
+        "prediction": pred,
+        "forecast_for": datetime.utcnow() + timedelta(days=horizon),
+        "generated_at": datetime.utcnow()
+    }
 
 
-
-# =====================================================
-# SHAP ENDPOINT
-# =====================================================
+# =========================================================
+# SHAP
+# =========================================================
 @app.get("/forecast/shap")
 def shap_explain(horizon: int = 1):
-    try:
-        import shap
+    import shap
 
-        model, features = load_production_model(horizon)
-        X_latest = get_latest_features(features)
+    model, features = load_production_model(horizon)
+    X = get_latest_features(features)
 
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(X_latest)
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(X)
 
-        contributions = [
-            {"feature": f, "shap_value": float(shap_values[0][i])}
-            for i, f in enumerate(features)
-        ]
+    log_pred = model.predict(X)[0]
+    pred = float(np.expm1(log_pred))
 
-        log_pred = model.predict(X_latest)[0]
-        prediction = float(np.expm1(log_pred))
+    contrib = [
+        {"feature": f, "shap": float(shap_values[0][i])}
+        for i, f in enumerate(features)
+    ]
 
-        return {
-            "status": "success",
-            "prediction": prediction,
-            "contributions": contributions,
-            "generated_at": datetime.utcnow()
-        }
-
-    except Exception as e:
-        raise HTTPException(500, str(e))
+    return {
+        "prediction": pred,
+        "contributions": contrib
+    }
