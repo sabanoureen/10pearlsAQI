@@ -20,22 +20,20 @@ def health_check():
 # ---------------------------------------------------
 # Find latest model file automatically
 # ---------------------------------------------------
-def get_latest_model_file(horizon: int):
+def get_latest_features(feature_columns):
 
-    BASE_DIR = Path(__file__).resolve().parents[2]
-    model_dir = BASE_DIR / f"models/rf_h{horizon}"
+    db = get_db()
+    collection = db["historical_hourly_data"]
 
-    if not model_dir.exists():
-        raise HTTPException(500, f"Model folder not found: {model_dir}")
+    latest_doc = collection.find_one({}, sort=[("datetime", -1)])
 
-    model_files = list(model_dir.glob("*.joblib"))
+    if not latest_doc:
+        # return zeros instead of crash
+        return np.zeros((1, len(feature_columns)))
 
-    if not model_files:
-        raise HTTPException(500, f"No model files in {model_dir}")
+    X = [latest_doc.get(col, 0) for col in feature_columns]
 
-    latest_model = max(model_files, key=lambda f: f.stat().st_mtime)
-
-    return latest_model
+    return np.array(X).reshape(1, -1)
 
 
 
