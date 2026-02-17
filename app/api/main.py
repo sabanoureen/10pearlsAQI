@@ -138,3 +138,12 @@ def shap_explain(horizon: int = 1):
         "prediction": pred,
         "contributions": contrib
     }
+@app.get("/env")
+def env_check():
+    import sklearn, pandas, numpy, joblib
+    return {
+        "sklearn": sklearn.__version__,
+        "pandas": pandas.__version__,
+        "numpy": numpy.__version__,
+        "joblib": joblib.__version__,
+    }

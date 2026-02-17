@@ -23,5 +23,3 @@ db/
 .env.*
 !app/db/
 !app/db/**
-models/
-*.joblib
