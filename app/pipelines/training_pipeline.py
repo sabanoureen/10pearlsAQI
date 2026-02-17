@@ -6,6 +6,9 @@ from app.pipelines.train_xgboost import train_xgboost
 from app.pipelines.train_gradient_boosting import train_gradient_boosting
 from app.pipelines.train_ensemble import train_ensemble
 from app.pipelines.select_best_model import select_best_model
+import joblib
+import os
+
 
 
 # ==========================================================
@@ -87,6 +90,25 @@ def run_training_pipeline(horizon: int = 1):
     print("\n🏆 Selecting best model...")
 
     best_model_info = select_best_model(horizon)
+        # --------------------------------------------------
+    # 6️⃣ Export production model (for API)
+    # --------------------------------------------------
+    print("\n💾 Exporting production model for API...")
+
+    best_model = best_model_info["model"]
+    feature_list = X.columns.tolist()
+
+    os.makedirs("models", exist_ok=True)
+
+    model_path = f"models/rf_model_h{horizon}.joblib"
+    features_path = f"models/features_h{horizon}.joblib"
+
+    joblib.dump(best_model, model_path)
+    joblib.dump(feature_list, features_path)
+
+    print(f"✔ Model saved → {model_path}")
+    print(f"✔ Features saved → {features_path}")
+
 
     print("\n🎯 Production Model Selected:")
     print(f"Model Name : {best_model_info['model_name']}")

@@ -1,4 +1,5 @@
 from app.db.mongo import get_model_registry
+import joblib
 
 
 def select_best_model(horizon: int):
@@ -12,7 +13,7 @@ def select_best_model(horizon: int):
     if not models:
         raise RuntimeError("No models found")
 
-    best_model = models[0]
+    best_doc = models[0]
 
     # Reset all models
     registry.update_many(
@@ -22,10 +23,24 @@ def select_best_model(horizon: int):
 
     # Set best model
     registry.update_one(
-        {"_id": best_model["_id"]},
+        {"_id": best_doc["_id"]},
         {"$set": {"status": "production", "is_best": True}}
     )
 
-    print(f"🏆 Best model: {best_model['model_name']} (RMSE={best_model['rmse']:.4f})")
+    model_name = best_doc["model_name"]
+    rmse = best_doc["rmse"]
+    mae = best_doc["mae"]
 
-    return best_model
+    print(f"🏆 Best model: {model_name} (RMSE={rmse:.4f})")
+
+    # ✅ LOAD MODEL FROM STORED PATH
+    model_path = best_doc["model_path"]
+
+    model = joblib.load(model_path)
+
+    return {
+        "model_name": model_name,
+        "rmse": rmse,
+        "mae": mae,
+        "model": model
+    }
