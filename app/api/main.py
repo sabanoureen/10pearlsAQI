@@ -13,144 +13,146 @@ from app.pipelines.training_pipeline import run_training_pipeline
 app = FastAPI(title="AQI Forecast API")
 
 
-# =========================================================
+# =====================================================
 # HEALTH
-# =========================================================
+# =====================================================
 @app.get("/")
 def health():
-    return {"status": "ok", "message": "AQI API running"}
+    return {"status": "success", "message": "AQI API running"}
 
 
-# =========================================================
-# MODEL PATH RESOLVER (SAFE)
-# =========================================================
-BASE_DIR = Path(__file__).resolve().parents[2]
-MODELS_DIR = BASE_DIR / "models"
-
-
-def get_latest_model_file(horizon: int) -> Path:
-    """
-    Returns latest joblib file inside models/rf_h{horizon}
-    """
-    folder = MODELS_DIR / f"rf_h{horizon}"
-
-    if not folder.exists():
-        raise HTTPException(500, f"Model folder missing: {folder}")
-
-    files = sorted(folder.glob("*.joblib"))
-
-    if not files:
-        raise HTTPException(500, f"No model files in {folder}")
-
-    return files[-1]
-
-
-# =========================================================
-# LOAD MODEL + FEATURES
-# =========================================================
+# =====================================================
+# LOAD PRODUCTION MODEL
+# =====================================================
 def load_production_model(horizon: int):
-
     registry = get_model_registry()
+
     doc = registry.find_one({"horizon": horizon, "is_best": True})
 
     if not doc:
-        raise RuntimeError("No production model in Mongo")
+        raise HTTPException(404, "No production model")
 
     model_path = doc["model_path"]
-    features = doc["features"]
 
-    try:
-        model = joblib.load(model_path)
-        return model, features
+    if not Path(model_path).exists():
+        raise HTTPException(500, "Model file missing")
 
-    except Exception as e:
-        print("⚠️ Model load failed — retraining:", e)
-
-        # retrain fresh model compatible with runtime
-        best = run_training_pipeline(horizon)
-
-        doc = registry.find_one({"horizon": horizon, "is_best": True})
-        model_path = doc["model_path"]
-        features = doc["features"]
-
-        model = joblib.load(model_path)
-        return model, features
+    model = joblib.load(model_path)
+    return model, doc["features"]
 
 
-# =========================================================
-# GET LATEST FEATURES FROM MONGO
-# =========================================================
-def get_latest_features(feature_columns):
+# =====================================================
+# LATEST FEATURES
+# =====================================================
+def get_latest_features(columns):
     db = get_db()
     col = db["historical_hourly_data"]
 
     doc = col.find_one({}, sort=[("datetime", -1)])
 
     if not doc:
-        raise HTTPException(404, "No historical data found")
+        raise HTTPException(404, "No data")
 
-    X = [doc.get(c, 0) for c in feature_columns]
-
+    X = [doc.get(c, 0) for c in columns]
     return np.array(X).reshape(1, -1)
 
 
-# =========================================================
+# =====================================================
 # FORECAST
-# =========================================================
+# =====================================================
 @app.get("/forecast/multi")
 def forecast_multi(horizon: int = 1):
     model, features = load_production_model(horizon)
     X_latest = get_latest_features(features)
 
-# FIX: align columns with training
-    X_latest = pd.DataFrame(X_latest, columns=features)
+    preds = []
+    base = datetime.utcnow()
 
-    log_pred = model.predict(X_latest)[0]
+    for d in range(1, horizon + 1):
+        log_p = model.predict(X_latest)[0]
+        p = float(np.expm1(log_p))
 
-    pred = float(np.expm1(log_pred))
+        preds.append({
+            "datetime": base + timedelta(days=d),
+            "predicted_aqi": p
+        })
 
     return {
         "status": "success",
         "horizon": horizon,
-        "prediction": pred,
-        "forecast_for": datetime.utcnow() + timedelta(days=horizon),
-        "generated_at": datetime.utcnow()
+        "generated_at": datetime.utcnow(),
+        "predictions": preds
     }
 
 
-# =========================================================
+# =====================================================
+# MODEL METRICS
+# =====================================================
+@app.get("/models/metrics")
+def model_metrics():
+    reg = get_model_registry()
+    docs = list(reg.find({}, {"_id": 0}))
+
+    if not docs:
+        return {"status": "error", "detail": "No models"}
+
+    return {"status": "success", "models": docs}
+
+
+# =====================================================
+# BEST MODEL
+# =====================================================
+@app.get("/models/best")
+def best_model():
+    reg = get_model_registry()
+    doc = reg.find_one({"is_best": True}, {"_id": 0})
+
+    if not doc:
+        return {"status": "error", "detail": "No best model"}
+
+    return {"status": "success", "model": doc}
+
+
+# =====================================================
+# FEATURE IMPORTANCE
+# =====================================================
+@app.get("/features/importance")
+def feature_importance(horizon: int = 1):
+    model, features = load_production_model(horizon)
+
+    if not hasattr(model, "feature_importances_"):
+        return {"status": "error", "detail": "No importance"}
+
+    data = [
+        {"feature": f, "importance": float(i)}
+        for f, i in zip(features, model.feature_importances_)
+    ]
+
+    return {"status": "success", "features": data}
+
+
+# =====================================================
 # SHAP
-# =========================================================
+# =====================================================
 @app.get("/forecast/shap")
 def shap_explain(horizon: int = 1):
     import shap
 
     model, features = load_production_model(horizon)
-    X_latest= get_latest_features(features)
-    X_latest = pd.DataFrame(X_latest, columns=features)
-
+    X_latest = get_latest_features(features)
 
     explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(X)
-
-    log_pred = model.predict(X)[0]
-    pred = float(np.expm1(log_pred))
+    shap_vals = explainer.shap_values(X_latest)
 
     contrib = [
-        {"feature": f, "shap": float(shap_values[0][i])}
-        for i, f in enumerate(features)
+        {"feature": f, "shap_value": float(v)}
+        for f, v in zip(features, shap_vals[0])
     ]
 
+    pred = float(np.expm1(model.predict(X_latest)[0]))
+
     return {
+        "status": "success",
         "prediction": pred,
         "contributions": contrib
-    }
-@app.get("/env")
-def env_check():
-    import sklearn, pandas, numpy, joblib
-    return {
-        "sklearn": sklearn.__version__,
-        "pandas": pandas.__version__,
-        "numpy": numpy.__version__,
-        "joblib": joblib.__version__,
     }
