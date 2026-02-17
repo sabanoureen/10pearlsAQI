@@ -3,109 +3,132 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import numpy as np
 import joblib
-import json
-import pandas as pd
+import shap
 
-from app.db.mongo import get_db
-from app.db.mongo import get_model_registry
-from app.pipelines.training_pipeline import run_training_pipeline
+from app.db.mongo import get_db, get_model_registry
 
 app = FastAPI(title="AQI Forecast API")
 
 
-# =====================================================
-# HEALTH
-# =====================================================
-@app.get("/")
-def health():
-    return {"status": "success", "message": "AQI API running"}
-
-
-# =====================================================
-# LOAD PRODUCTION MODEL
-# =====================================================
+# ---------------------------------------------------
+# Load production model
+# ---------------------------------------------------
 def load_production_model(horizon: int):
+
     registry = get_model_registry()
 
-    doc = registry.find_one({"horizon": horizon, "is_best": True})
+    doc = registry.find_one({
+        "horizon": horizon,
+        "is_best": True
+    })
 
     if not doc:
-        raise HTTPException(404, "No production model")
+        raise HTTPException(status_code=404, detail="No production model")
 
     model_path = doc["model_path"]
 
     if not Path(model_path).exists():
-        raise HTTPException(500, "Model file missing")
+        raise HTTPException(status_code=500, detail="Model file missing")
 
     model = joblib.load(model_path)
-    return model, doc["features"]
+
+    return model, doc["features"], doc
 
 
-# =====================================================
-# LATEST FEATURES
-# =====================================================
-def get_latest_features(columns):
+# ---------------------------------------------------
+# Latest features
+# ---------------------------------------------------
+def get_latest_features(feature_columns):
+
     db = get_db()
-    col = db["historical_hourly_data"]
+    latest = db["historical_hourly_data"].find_one(
+        {}, sort=[("datetime", -1)]
+    )
 
-    doc = col.find_one({}, sort=[("datetime", -1)])
+    if not latest:
+        raise HTTPException(status_code=404, detail="No data")
 
-    if not doc:
-        raise HTTPException(404, "No data")
-
-    X = [doc.get(c, 0) for c in columns]
+    X = [latest.get(f, 0) for f in feature_columns]
     return np.array(X).reshape(1, -1)
 
 
-# =====================================================
-# FORECAST
-# =====================================================
+# ---------------------------------------------------
+# Forecast
+# ---------------------------------------------------
 @app.get("/forecast/multi")
-def forecast_multi(horizon: int = 1):
-    model, features = load_production_model(horizon)
+def multi_forecast(horizon: int = 1):
+
+    model, features, _ = load_production_model(horizon)
     X_latest = get_latest_features(features)
 
     preds = []
     base = datetime.utcnow()
 
     for d in range(1, horizon + 1):
-        log_p = model.predict(X_latest)[0]
-        p = float(np.expm1(log_p))
+        log_pred = model.predict(X_latest)[0]
+        pred = float(np.expm1(log_pred))
 
         preds.append({
             "datetime": base + timedelta(days=d),
-            "predicted_aqi": p
+            "predicted_aqi": pred
         })
 
     return {
         "status": "success",
         "horizon": horizon,
-        "generated_at": datetime.utcnow(),
         "predictions": preds
     }
 
 
-# =====================================================
-# MODEL METRICS
-# =====================================================
+# ---------------------------------------------------
+# SHAP
+# ---------------------------------------------------
+@app.get("/forecast/shap")
+def shap_explain(horizon: int = 1):
+
+    model, features, _ = load_production_model(horizon)
+    X_latest = get_latest_features(features)
+
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(X_latest)
+
+    contrib = [
+        {"feature": f, "shap_value": float(v)}
+        for f, v in zip(features, shap_values[0])
+    ]
+
+    pred = float(np.expm1(model.predict(X_latest)[0]))
+
+    return {
+        "status": "success",
+        "prediction": pred,
+        "contributions": contrib
+    }
+
+
+# ---------------------------------------------------
+# Metrics
+# ---------------------------------------------------
 @app.get("/models/metrics")
 def model_metrics():
-    reg = get_model_registry()
-    docs = list(reg.find({}, {"_id": 0}))
 
-    if not docs:
-        return {"status": "error", "detail": "No models"}
+    registry = get_model_registry()
+    docs = list(registry.find({}, {"_id": 0}))
 
-    return {"status": "success", "models": docs}
+    return {
+        "status": "success",
+        "models": docs
+    }
 
 
-# =====================================================
-# BEST MODEL
-# =====================================================
+# ---------------------------------------------------
+# Best model
+# ---------------------------------------------------
 @app.get("/models/best")
 def best_model():
-    reg = get_model_registry()
-    doc = reg.find_one({"is_best": True}, {"_id": 0})
+
+    registry = get_model_registry()
+    doc = registry.find_one({"is_best": True}, {"_id": 0})
 
     if not doc:
         return {"status": "error", "detail": "No best model"}
@@ -113,12 +136,13 @@ def best_model():
     return {"status": "success", "model": doc}
 
 
-# =====================================================
-# FEATURE IMPORTANCE
-# =====================================================
+# ---------------------------------------------------
+# Feature importance
+# ---------------------------------------------------
 @app.get("/features/importance")
 def feature_importance(horizon: int = 1):
-    model, features = load_production_model(horizon)
+
+    model, features, _ = load_production_model(horizon)
 
     if not hasattr(model, "feature_importances_"):
         return {"status": "error", "detail": "No importance"}
@@ -129,30 +153,3 @@ def feature_importance(horizon: int = 1):
     ]
 
     return {"status": "success", "features": data}
-
-
-# =====================================================
-# SHAP
-# =====================================================
-@app.get("/forecast/shap")
-def shap_explain(horizon: int = 1):
-    import shap
-
-    model, features = load_production_model(horizon)
-    X_latest = get_latest_features(features)
-
-    explainer = shap.TreeExplainer(model)
-    shap_vals = explainer.shap_values(X_latest)
-
-    contrib = [
-        {"feature": f, "shap_value": float(v)}
-        for f, v in zip(features, shap_vals[0])
-    ]
-
-    pred = float(np.expm1(model.predict(X_latest)[0]))
-
-    return {
-        "status": "success",
-        "prediction": pred,
-        "contributions": contrib
-    }
