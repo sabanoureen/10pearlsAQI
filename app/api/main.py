@@ -75,19 +75,8 @@ def load_production_model(horizon: int):
 # Get latest feature row from Mongo (SAFE)
 # ---------------------------------------------------
 def get_latest_features(feature_columns):
-
-    db = get_db()
-    collection = db["historical_hourly_data"]
-
-    latest_doc = collection.find_one({}, sort=[("datetime", -1)])
-
-    # if DB empty → return zeros
-    if not latest_doc:
-        return np.zeros((1, len(feature_columns)))
-
-    X = [latest_doc.get(col, 0) for col in feature_columns]
-
-    return np.array(X).reshape(1, -1)
+    # temporary: no Mongo dependency
+    return np.zeros((1, len(feature_columns)))
 
 
 # ---------------------------------------------------
