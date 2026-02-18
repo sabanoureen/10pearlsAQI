@@ -38,6 +38,27 @@ page = st.sidebar.radio(
 
 st.title("🌍 AQI Forecast & Explainability Dashboard")
 
+
+# ==============================
+# HELPER FUNCTION
+# ==============================
+def call_api(endpoint, params=None, timeout=20):
+    try:
+        r = requests.get(
+            f"{API_URL}{endpoint}",
+            params=params,
+            timeout=timeout
+        )
+
+        if r.status_code != 200:
+            return None, f"API returned {r.status_code}"
+
+        return r.json(), None
+
+    except Exception as e:
+        return None, str(e)
+
+
 # =====================================================
 # FORECAST
 # =====================================================
@@ -47,20 +68,20 @@ if page == "📈 Forecast":
 
     if st.button("Generate Forecast"):
 
-        try:
-            r = requests.get(
-                f"{API_URL}/forecast/multi",
-                params={"horizon": horizon},
-                timeout=20
-            )
-            data = r.json()
+        data, error = call_api(
+            "/forecast/multi",
+            params={"horizon": horizon}
+        )
 
-            if data["status"] != "success":
-                st.error("API error")
+        if error:
+            st.error(f"API Error: {error}")
+        else:
+            pred = data.get("prediction")
+            forecast_time = data.get("forecast_for")
+
+            if pred is None:
+                st.error("Invalid API response")
             else:
-                pred = data["prediction"]
-                forecast_time = data["forecast_for"]
-
                 st.success("Forecast generated")
 
                 col1, col2 = st.columns(2)
@@ -68,10 +89,9 @@ if page == "📈 Forecast":
                 col1.metric("Predicted AQI", f"{pred:.2f}")
                 col2.metric("Forecast Horizon", f"{horizon} day")
 
-                st.caption(f"Forecast for: {forecast_time}")
+                if forecast_time:
+                    st.caption(f"Forecast for: {forecast_time}")
 
-        except Exception as e:
-            st.error(f"API Error: {e}")
 
 # =====================================================
 # MODEL COMPARISON
@@ -80,14 +100,17 @@ elif page == "📊 Model Comparison":
 
     st.header("Model Performance Comparison")
 
-    try:
-        r = requests.get(f"{API_URL}/models/metrics", timeout=20)
-        data = r.json()
+    data, error = call_api("/models/metrics")
 
-        if data["status"] != "success":
-            st.error("No metrics available")
+    if error:
+        st.error(error)
+    else:
+        models = data.get("models", [])
+
+        if not models:
+            st.warning("No metrics available")
         else:
-            df = pd.DataFrame(data["models"])
+            df = pd.DataFrame(models)
 
             st.dataframe(df, use_container_width=True)
 
@@ -101,8 +124,6 @@ elif page == "📊 Model Comparison":
             )
             st.plotly_chart(fig, use_container_width=True)
 
-    except Exception as e:
-        st.error(f"API Error: {e}")
 
 # =====================================================
 # SHAP
@@ -113,18 +134,22 @@ elif page == "🧠 SHAP Analysis":
 
     if st.button("Generate SHAP"):
 
-        try:
-            r = requests.get(
-                f"{API_URL}/forecast/shap",
-                params={"horizon": horizon},
-                timeout=30
-            )
-            data = r.json()
+        data, error = call_api(
+            "/forecast/shap",
+            params={"horizon": horizon},
+            timeout=30
+        )
 
-            if data["status"] != "success":
-                st.error("SHAP error")
+        if error:
+            st.error(error)
+        else:
+            contributions = data.get("contributions", [])
+            pred = data.get("prediction")
+
+            if not contributions:
+                st.warning("No SHAP data")
             else:
-                df = pd.DataFrame(data["contributions"])
+                df = pd.DataFrame(contributions)
                 df = df.sort_values(
                     "shap_value",
                     key=abs,
@@ -140,10 +165,9 @@ elif page == "🧠 SHAP Analysis":
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
-                st.metric("Predicted AQI", f"{data['prediction']:.2f}")
+                if pred is not None:
+                    st.metric("Predicted AQI", f"{pred:.2f}")
 
-        except Exception as e:
-            st.error(f"API Error: {e}")
 
 # =====================================================
 # BEST MODEL
@@ -152,23 +176,28 @@ elif page == "🏆 Best Model":
 
     st.header("Production Model")
 
-    try:
-        r = requests.get(f"{API_URL}/models/best", timeout=10)
-        data = r.json()
+    data, error = call_api("/models/best")
 
-        if data["status"] != "success":
-            st.error("No production model")
+    if error:
+        st.error(error)
+    else:
+        model_name = data.get("model_name")
+        rmse = data.get("rmse")
+        mae = data.get("mae")
+        horizon_val = data.get("horizon")
+
+        if model_name is None:
+            st.warning("No production model")
         else:
             col1, col2, col3 = st.columns(3)
 
-            col1.metric("Model", data["model_name"])
-            col2.metric("RMSE", f"{data['rmse']:.2f}")
-            col3.metric("MAE", f"{data['mae']:.2f}")
+            col1.metric("Model", model_name)
+            col2.metric("RMSE", f"{rmse:.2f}")
+            col3.metric("MAE", f"{mae:.2f}")
 
-            st.caption(f"Horizon: {data['horizon']}")
+            if horizon_val:
+                st.caption(f"Horizon: {horizon_val}")
 
-    except Exception as e:
-        st.error(f"API Error: {e}")
 
 # =====================================================
 # IMPORTANT FEATURES
@@ -177,18 +206,20 @@ elif page == "⭐ Important Features":
 
     st.header("Feature Importance")
 
-    try:
-        r = requests.get(
-            f"{API_URL}/models/features",
-            params={"horizon": horizon},
-            timeout=20
-        )
-        data = r.json()
+    data, error = call_api(
+        "/models/features",
+        params={"horizon": horizon}
+    )
 
-        if data["status"] != "success":
-            st.error("No feature importance")
+    if error:
+        st.error(error)
+    else:
+        features = data.get("features", [])
+
+        if not features:
+            st.warning("No feature importance")
         else:
-            df = pd.DataFrame(data["features"])
+            df = pd.DataFrame(features)
 
             fig = px.bar(
                 df.head(15),
@@ -198,6 +229,3 @@ elif page == "⭐ Important Features":
                 title="Top Important Features"
             )
             st.plotly_chart(fig, use_container_width=True)
-
-    except Exception as e:
-        st.error(f"API Error: {e}")
