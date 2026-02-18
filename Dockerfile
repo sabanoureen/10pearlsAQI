@@ -1,23 +1,13 @@
-# Use official Python image
 FROM python:3.11-slim
 
-# Set working directory
 WORKDIR /app
 
-# Copy project files
-COPY . /app
+COPY requirements_backend.txt .
+RUN pip install -r requirements_backend.txt
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+COPY app /app/app
+COPY scripts /app/scripts
+COPY models /app/models   # 👈 ADD THIS
 
-# Install Python dependencies
-RUN pip install --upgrade pip
-RUN pip install -r requirements.txt
-
-# Expose FastAPI port
-EXPOSE 8000
-
-# Start FastAPI server
 CMD ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
