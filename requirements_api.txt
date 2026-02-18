@@ -10,3 +10,5 @@ numpy==1.23.5
 scikit-learn==1.2.2
 joblib==1.2.0
 shap
+pymongo
+gridfs

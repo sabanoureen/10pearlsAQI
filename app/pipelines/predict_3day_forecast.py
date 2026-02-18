@@ -1,6 +1,6 @@
 import pandas as pd
 
-from app.utils.load_production_model import load_production_model
+from app.utils.model_loader import load_production_model
 from app.db.mongo import get_db
 from app.pipelines.fetch_live_openmeteo import fetch_live_weather
 from app.pipelines.aqi_calculation import add_aqi_column
