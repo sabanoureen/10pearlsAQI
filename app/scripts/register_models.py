@@ -89,3 +89,10 @@ for model in models:
     print(f"✅ Registered model for horizon {model['horizon']}")
 
 print("\n🚀 Production models successfully registered.")
+model_doc = {
+    "horizon": horizon,
+    "model_path": f"models/rf_h{horizon}/{model_filename}",
+    "features": feature_list,
+    "is_best": True
+}
+
