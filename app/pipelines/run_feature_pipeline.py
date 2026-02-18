@@ -3,7 +3,7 @@ Feature Pipeline Runner
 -----------------------
 - Builds latest feature dataframe
 - Writes features to MongoDB feature store
-- Single CI/CD entry point
+- Optimized bulk insert for CI/CD
 """
 
 import sys
@@ -14,7 +14,7 @@ sys.path.append(
 )
 
 from app.pipelines.final_feature_table import build_final_dataframe
-from app.pipelines.save_features import save_features
+from app.db.mongo import get_feature_store
 
 
 def run():
@@ -25,15 +25,22 @@ def run():
     if df is None or df.empty:
         raise RuntimeError("❌ Feature pipeline produced empty dataframe")
 
-    # 🔥 CLEAR OLD DATA (optional but recommended)
-    from app.db.mongo import get_feature_store
-    get_feature_store().delete_many({})
+    collection = get_feature_store()
 
-    # 🔥 INSERT EACH ROW
-    for _, row in df.iterrows():
-        save_features(city="Karachi", row=row.to_dict())
+    # 🔥 CLEAR OLD DATA (prevent duplication)
+    print("🧹 Clearing old feature store data...")
+    collection.delete_many({})
 
-    print(f"✅ Feature pipeline success | rows={len(df)} inserted into Mongo")
+    # 🔥 BULK INSERT (FAST)
+    records = df.to_dict("records")
+
+    if records:
+        collection.insert_many(records)
+        print(f"✅ Inserted {len(records)} records successfully")
+    else:
+        print("⚠ No records to insert")
+
+    print("🎯 Feature pipeline completed successfully")
 
 
 if __name__ == "__main__":
