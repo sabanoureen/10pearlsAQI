@@ -66,3 +66,4 @@ def load_production_model(horizon: int):
     )
 
     return model, features, model_version
+    print("Loading model from:", model_doc["model_path"])
