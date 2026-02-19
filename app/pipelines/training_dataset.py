@@ -23,40 +23,33 @@ def load_historical_df():
 # -------------------------------------------------------
 # Build Training Dataset
 # -------------------------------------------------------
-def build_training_dataset(horizon: int):
+def build_training_dataset(horizon):
 
-    df = load_historical_df()
+    df = ...  # your existing code
 
-    # Datetime processing
-    df["datetime"] = pd.to_datetime(df["datetime"])
-    df = df.sort_values("datetime").reset_index(drop=True)
+    # Select correct target
+    if horizon == 1:
+        target_col = "target_h1"
+    elif horizon == 2:
+        target_col = "target_h2"
+    elif horizon == 3:
+        target_col = "target_h3"
+    else:
+        raise ValueError("Invalid horizon")
 
-    # Remove missing pm2_5
-    df = df.dropna(subset=["pm2_5"])
+    feature_cols = [
+        "hour",
+        "day",
+        "month",
+        "lag_1",
+        "lag_3",
+        "lag_6",
+        "roll_mean_6",
+        "roll_mean_12"
+    ]
 
-    # 🔥 Create TARGET FIRST (before log)
-    shift_hours = horizon * 24
-    df["target"] = df["pm2_5"].shift(-shift_hours)
-
-    # Drop rows where future target is missing
-    df = df.dropna(subset=["target"]).reset_index(drop=True)
-
-    # 🔥 Apply log transform to BOTH feature + target
-    df["pm2_5"] = np.log1p(df["pm2_5"])
-    df["target"] = np.log1p(df["target"])
-
-    # Feature engineering
-    df = add_time_features(df)
-    df = add_lag_features(df)
-    df = add_rolling_features(df)
-
-    # Drop rows created by lag/rolling
-    df = df.dropna().reset_index(drop=True)
-
-    # 🔥 REMOVE current pm2_5 from features (NO LEAKAGE)
-    drop_cols = ["datetime", "target", "pm2_5"]
-
-    X = df.drop(columns=drop_cols)
-    y = df["target"]
+    X = df[feature_cols]
+    y = df[target_col]
 
     return X, y
+

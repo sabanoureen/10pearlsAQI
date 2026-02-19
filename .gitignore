@@ -24,3 +24,5 @@ db/
 !app/db/
 !app/db/**
 
+historical_data.csv
+models/
