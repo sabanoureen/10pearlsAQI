@@ -7,24 +7,23 @@ from app.pipelines.training_dataset import build_training_dataset
 
 
 def load_production_model(horizon: int):
-
     registry = get_model_registry()
 
     model_doc = registry.find_one({
         "horizon": horizon,
-        "is_best": True,
-        "status": "production"
+        "is_best": True
     })
 
     if not model_doc:
-        raise RuntimeError("No production model found")
+        raise RuntimeError(f"No production model found for horizon {horizon}")
 
-    fs = get_fs()
-    model_bytes = fs.get(model_doc["gridfs_id"]).read()
-    model = joblib.load(io.BytesIO(model_bytes))
+    model_path = model_doc["model_path"]
 
-    return model, model_doc["features"], model_doc["model_name"]
+    model = joblib.load(model_path)
 
+    features = model_doc.get("features", [])
+
+    return model, features, model_doc["model_name"]
 
 def predict_next_3_days():
 
