@@ -23,33 +23,57 @@ def load_historical_df():
 # -------------------------------------------------------
 # Build Training Dataset
 # -------------------------------------------------------
-def build_training_dataset(horizon):
+def build_training_dataset():
+    """
+    Build training dataset from historical_hourly_data
+    Create lag + rolling + multi-horizon targets
+    """
 
-    df = ...  # your existing code
+    db = get_db()
+    collection = db["historical_hourly_data"]
 
-    # Select correct target
-    if horizon == 1:
-        target_col = "target_h1"
-    elif horizon == 2:
-        target_col = "target_h2"
-    elif horizon == 3:
-        target_col = "target_h3"
-    else:
-        raise ValueError("Invalid horizon")
+    data = list(collection.find({}, {"_id": 0}))
 
-    feature_cols = [
-        "hour",
-        "day",
-        "month",
-        "lag_1",
-        "lag_3",
-        "lag_6",
-        "roll_mean_6",
-        "roll_mean_12"
-    ]
+    if not data:
+        raise RuntimeError("❌ No historical data found")
 
-    X = df[feature_cols]
-    y = df[target_col]
+    df = pd.DataFrame(data)
 
-    return X, y
+    df["datetime"] = pd.to_datetime(df["datetime"])
+    df = df.sort_values("datetime").reset_index(drop=True)
 
+    # Target variable
+    df["aqi_pm25"] = df["pm2_5"]
+
+    # --------------------------
+    # Time Features
+    # --------------------------
+    df["hour"] = df["datetime"].dt.hour
+    df["day"] = df["datetime"].dt.day
+    df["month"] = df["datetime"].dt.month
+
+    # --------------------------
+    # Lag Features
+    # --------------------------
+    df["lag_1"] = df["aqi_pm25"].shift(1)
+    df["lag_3"] = df["aqi_pm25"].shift(3)
+    df["lag_6"] = df["aqi_pm25"].shift(6)
+
+    # --------------------------
+    # Rolling Features
+    # --------------------------
+    df["roll_mean_6"] = df["aqi_pm25"].rolling(6).mean()
+    df["roll_mean_12"] = df["aqi_pm25"].rolling(12).mean()
+
+    # --------------------------
+    # Multi-Horizon Targets
+    # --------------------------
+    df["target_h1"] = df["aqi_pm25"].shift(-24)
+    df["target_h2"] = df["aqi_pm25"].shift(-48)
+    df["target_h3"] = df["aqi_pm25"].shift(-72)
+
+    df = df.dropna().reset_index(drop=True)
+
+    print("✅ Training dataset built:", df.shape)
+
+    return df
