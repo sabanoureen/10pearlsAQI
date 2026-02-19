@@ -32,11 +32,12 @@ def load_production_model(horizon):
 
 def predict_next_3_days():
 
-    df = build_training_dataset()
-
     results = {}
 
     for horizon in [1, 2, 3]:
+
+        # Build dataset per horizon
+        df = build_training_dataset(horizon)
 
         model, features, model_name = load_production_model(horizon)
 
@@ -44,7 +45,9 @@ def predict_next_3_days():
 
         prediction = model.predict(latest_row)[0]
 
-        future_date = (datetime.utcnow() + timedelta(days=horizon)).strftime("%Y-%m-%d")
+        future_date = (
+            datetime.utcnow() + timedelta(days=horizon)
+        ).strftime("%Y-%m-%d")
 
         results[f"{horizon}_day"] = {
             "value": round(float(prediction), 2),
