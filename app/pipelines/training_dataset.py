@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from app.db.mongo import get_db
+from app.db.mongo import get_database
 from app.pipelines.feature_engineering_time import add_time_features
 from app.pipelines.feature_engineering_lag import add_lag_features
 from app.pipelines.feature_engineering_rolling import add_rolling_features
@@ -29,7 +29,8 @@ def build_training_dataset():
     Create lag + rolling + multi-horizon targets
     """
 
-    db = get_db()
+    db = get_database()
+
     collection = db["historical_hourly_data"]
 
     data = list(collection.find({}, {"_id": 0}))
