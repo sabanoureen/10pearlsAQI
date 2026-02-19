@@ -3,7 +3,8 @@ import io
 from gridfs import GridFS
 from datetime import datetime, timedelta
 
-from app.db.mongo import get_db, get_model_registry
+from app.db.mongo import get_database, get_model_registry
+
 from app.pipelines.final_feature_table import build_training_dataset
 
 
@@ -19,7 +20,8 @@ def load_production_model(horizon):
     if not model_doc:
         raise RuntimeError(f"No production model for horizon {horizon}")
 
-    db = get_db()
+    db = get_database()
+
     fs = GridFS(db)
 
     model_bytes = fs.get(model_doc["gridfs_id"]).read()

@@ -17,11 +17,14 @@ client = MongoClient(MONGO_URI)
 DATABASE_NAME = "aqi_system"
 db = client[DATABASE_NAME]
 
+# -----------------------------------------
+# Database Getter
+# -----------------------------------------
+def get_db():
+    return db
 
-# -----------------------------------------
-# Generic Database Getter
-# -----------------------------------------
-def get_database():
+
+def get_database():   # optional alias (safe for older imports)
     return db
 
 

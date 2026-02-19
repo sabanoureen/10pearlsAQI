@@ -4,7 +4,8 @@ from pathlib import Path
 import numpy as np
 import joblib
 
-from app.db.mongo import get_db, get_model_registry
+from app.db.mongo import get_database, get_model_registry
+
 
 app = FastAPI(title="AQI Forecast API")
 
