@@ -36,8 +36,8 @@ def predict_next_3_days():
 
     for horizon in [1, 2, 3]:
 
-        # Build dataset per horizon
-        df = build_training_dataset(horizon)
+        # IMPORTANT: unpack properly
+        df, _ = build_training_dataset(horizon)
 
         model, features, model_name = load_production_model(horizon)
 
