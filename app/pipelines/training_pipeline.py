@@ -1,13 +1,15 @@
-import os
-import joblib
 import argparse
-import pandas as pd
+import io
 from datetime import datetime
+
+import joblib
+import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from gridfs import GridFS
 
 from app.pipelines.training_dataset import build_training_dataset
-from app.db.mongo import get_model_registry
+from app.db.mongo import get_model_registry, get_database
 
 
 # -------------------------------------------
@@ -58,19 +60,32 @@ def train_horizon(df, horizon: int):
     print("R2:", r2)
 
     # -------------------------------------------
-    # Save Model
+    # Save Model to GridFS
     # -------------------------------------------
-    model_dir = f"models/rf_h{horizon}"
-    os.makedirs(model_dir, exist_ok=True)
+    db = get_database()
+    fs = GridFS(db)
 
-    model_path = f"{model_dir}/model_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.joblib"
+    buffer = io.BytesIO()
+    joblib.dump(model, buffer)
+    buffer.seek(0)
 
-    joblib.dump(model, model_path)
+    file_id = fs.put(
+        buffer.read(),
+        filename=f"rf_h{horizon}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    )
+
+    print("📁 Model stored in GridFS")
 
     # -------------------------------------------
     # Register Model
     # -------------------------------------------
     registry = get_model_registry()
+
+    # 🔴 Make previous production model non-production
+    registry.update_many(
+        {"horizon": horizon, "status": "production"},
+        {"$set": {"status": "archived", "is_best": False}}
+    )
 
     registry.insert_one({
         "model_name": "random_forest",
@@ -78,7 +93,7 @@ def train_horizon(df, horizon: int):
         "rmse": rmse,
         "mae": mae,
         "r2": r2,
-        "model_path": model_path,
+        "gridfs_id": file_id,
         "features": feature_cols,
         "status": "production",
         "is_best": True,
