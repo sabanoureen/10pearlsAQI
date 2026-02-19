@@ -1,36 +1,33 @@
 import os
 from pymongo import MongoClient
-from gridfs import GridFS
 
+# -----------------------------------------
+# MongoDB Connection
+# -----------------------------------------
+MONGO_URI = os.getenv("MONGODB_URI")
 
-# -------------------------------------------------
-# Environment Variables
-# -------------------------------------------------
-MONGODB_URI = os.getenv("MONGODB_URI")
-DATABASE_NAME = os.getenv("DATABASE_NAME", "aqi_system")
+if not MONGO_URI:
+    raise RuntimeError("❌ MONGODB_URI not set")
 
-if not MONGODB_URI:
-    raise ValueError("❌ MONGODB_URI not set")
+client = MongoClient(MONGO_URI)
 
-# -------------------------------------------------
-# Mongo Client
-# -------------------------------------------------
-client = MongoClient(MONGODB_URI)
+# -----------------------------------------
+# Database
+# -----------------------------------------
+DATABASE_NAME = "aqi_system"
 db = client[DATABASE_NAME]
 
-# -------------------------------------------------
-# GridFS for Model Storage
-# -------------------------------------------------
-fs = GridFS(db)
 
-
-# -------------------------------------------------
-# Helper Functions
-# -------------------------------------------------
-def get_db():
+# -----------------------------------------
+# Generic Database Getter
+# -----------------------------------------
+def get_database():
     return db
 
 
+# -----------------------------------------
+# Collections
+# -----------------------------------------
 def get_model_registry():
     return db["model_registry"]
 
@@ -39,5 +36,5 @@ def get_feature_store():
     return db["feature_store"]
 
 
-def get_fs():
-    return fs
+def get_daily_forecast():
+    return db["daily_forecast"]
