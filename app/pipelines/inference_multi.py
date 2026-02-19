@@ -1,12 +1,14 @@
-import io
 import joblib
+import io
+from gridfs import GridFS
 from datetime import datetime, timedelta
 
-from app.db.mongo import get_model_registry, get_fs
-from app.pipelines.training_dataset import build_training_dataset
+from app.db.mongo import get_db, get_model_registry
+from app.pipelines.final_feature_table import build_training_dataset
 
 
-def load_production_model(horizon: int):
+def load_production_model(horizon):
+
     registry = get_model_registry()
 
     model_doc = registry.find_one({
@@ -15,41 +17,37 @@ def load_production_model(horizon: int):
     })
 
     if not model_doc:
-        raise RuntimeError(f"No production model found for horizon {horizon}")
+        raise RuntimeError(f"No production model for horizon {horizon}")
 
-    model_path = model_doc["model_path"]
+    db = get_db()
+    fs = GridFS(db)
 
-    model = joblib.load(model_path)
+    model_bytes = fs.get(model_doc["gridfs_id"]).read()
+    model = joblib.load(io.BytesIO(model_bytes))
 
-    features = model_doc.get("features", [])
+    return model, model_doc["features"], model_doc["model_name"]
 
-    return model, features, model_doc["model_name"]
 
 def predict_next_3_days():
 
+    df = build_training_dataset()
+
     results = {}
-    today = datetime.utcnow().date()
 
     for horizon in [1, 2, 3]:
 
         model, features, model_name = load_production_model(horizon)
 
-        X, _ = build_training_dataset(horizon)
-        X_latest = X.tail(1)
-        X_latest = X_latest[features]
+        latest_row = df.iloc[-1][features].values.reshape(1, -1)
 
-        prediction = model.predict(X_latest)[0]
+        prediction = model.predict(latest_row)[0]
 
-        forecast_date = today + timedelta(days=horizon)
+        future_date = (datetime.utcnow() + timedelta(days=horizon)).strftime("%Y-%m-%d")
 
         results[f"{horizon}_day"] = {
-            "date": str(forecast_date),
             "value": round(float(prediction), 2),
+            "date": future_date,
             "model": model_name
         }
 
     return results
-
-
-if __name__ == "__main__":
-    print(predict_next_3_days())

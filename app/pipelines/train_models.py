@@ -1,91 +1,90 @@
-"""
-Train All Candidate Models
---------------------------
-- Random Forest
-- Gradient Boosting
-- XGBoost
-- Registers models in MongoDB
-"""
-
 import joblib
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.metrics import mean_squared_error, mean_absolute_error
-import xgboost as xgb
-import numpy as np
+import io
+from datetime import datetime
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from gridfs import GridFS
 
-from app.db.mongo import get_model_registry
+from app.db.mongo import get_db, get_model_registry
 
 
-# ==========================================================
-# Utility: Evaluate Model
-# ==========================================================
 def evaluate_model(model, X_val, y_val):
-
     preds = model.predict(X_val)
 
-    rmse = np.sqrt(mean_squared_error(y_val, preds))
+    rmse = mean_squared_error(y_val, preds, squared=False)
     mae = mean_absolute_error(y_val, preds)
+    r2 = r2_score(y_val, preds)
 
-    return rmse, mae
+    return rmse, mae, r2
 
 
-# ==========================================================
-# Register Model in MongoDB
-# ==========================================================
-def register_model(model, model_name, rmse, mae, horizon, run_id):
+def save_model_to_gridfs(model, model_name, horizon):
+    db = get_db()
+    fs = GridFS(db)
 
+    model_bytes = io.BytesIO()
+    joblib.dump(model, model_bytes)
+    model_bytes.seek(0)
+
+    gridfs_id = fs.put(
+        model_bytes.read(),
+        filename=f"{model_name}_h{horizon}",
+        uploadDate=datetime.utcnow()
+    )
+
+    return gridfs_id
+
+
+def register_model(model_name, horizon, rmse, mae, r2, gridfs_id, features, run_id):
     registry = get_model_registry()
 
-    registry.insert_one({
+    model_doc = {
         "model_name": model_name,
         "horizon": horizon,
+        "rmse": rmse,
+        "mae": mae,
+        "r2": r2,
+        "gridfs_id": gridfs_id,
+        "features": features,
         "run_id": run_id,
-        "rmse": float(rmse),
-        "mae": float(mae),
-        "is_best": False
-    })
+        "status": "candidate",
+        "is_best": False,
+        "registered_at": datetime.utcnow()
+    }
+
+    registry.insert_one(model_doc)
 
 
-# ==========================================================
-# MAIN FUNCTION (THIS WAS MISSING)
-# ==========================================================
 def train_all_models(X_train, y_train, X_val, y_val, horizon, run_id):
 
-    print("\n🔵 Training Random Forest...")
-    rf = RandomForestRegressor(
-        n_estimators=200,
-        max_depth=10,
-        random_state=42
-    )
-    rf.fit(X_train, y_train)
-    rf_rmse, rf_mae = evaluate_model(rf, X_val, y_val)
-    print(f"RF RMSE: {rf_rmse:.4f}")
-    register_model(rf, "RandomForest", rf_rmse, rf_mae, horizon, run_id)
+    from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+    from sklearn.linear_model import Ridge
+    from xgboost import XGBRegressor
 
+    models = {
+        "random_forest": RandomForestRegressor(n_estimators=200, random_state=42),
+        "gradient_boosting": GradientBoostingRegressor(),
+        "ridge": Ridge(),
+        "xgboost": XGBRegressor(objective="reg:squarederror")
+    }
 
-    print("\n🟢 Training Gradient Boosting...")
-    gb = GradientBoostingRegressor(
-        n_estimators=200,
-        learning_rate=0.05,
-        random_state=42
-    )
-    gb.fit(X_train, y_train)
-    gb_rmse, gb_mae = evaluate_model(gb, X_val, y_val)
-    print(f"GB RMSE: {gb_rmse:.4f}")
-    register_model(gb, "GradientBoosting", gb_rmse, gb_mae, horizon, run_id)
+    for name, model in models.items():
+        print(f"\n🔹 Training {name} (H{horizon})")
 
+        model.fit(X_train, y_train)
 
-    print("\n🟣 Training XGBoost...")
-    xgb_model = xgb.XGBRegressor(
-        n_estimators=200,
-        learning_rate=0.05,
-        max_depth=6,
-        random_state=42
-    )
-    xgb_model.fit(X_train, y_train)
-    xgb_rmse, xgb_mae = evaluate_model(xgb_model, X_val, y_val)
-    print(f"XGB RMSE: {xgb_rmse:.4f}")
-    register_model(xgb_model, "XGBoost", xgb_rmse, xgb_mae, horizon, run_id)
+        rmse, mae, r2 = evaluate_model(model, X_val, y_val)
 
+        print(f"RMSE={rmse:.4f} | MAE={mae:.4f} | R2={r2:.4f}")
 
-    print("\n✅ All candidate models trained & registered")
+        gridfs_id = save_model_to_gridfs(model, name, horizon)
+
+        register_model(
+            model_name=name,
+            horizon=horizon,
+            rmse=rmse,
+            mae=mae,
+            r2=r2,
+            gridfs_id=gridfs_id,
+            features=list(X_train.columns),
+            run_id=run_id
+        )
