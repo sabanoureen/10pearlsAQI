@@ -1,12 +1,4 @@
 """
-Feature Pipeline
-----------------
-- Fetches latest AQI + weather data
-- Performs feature engineering
-- Stores features in MongoDB
-"""
-
-"""
 Feature Engineering
 -------------------
 - Reads historical_hourly_data
