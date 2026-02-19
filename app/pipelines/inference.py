@@ -1,7 +1,7 @@
 import io
 import joblib
 from gridfs import GridFS
-from app.db.mongo import get_database, get_model_registry
+from app.db.mongo import get_model_registry, get_database
 
 
 def load_production_model(horizon: int):
@@ -10,11 +10,15 @@ def load_production_model(horizon: int):
 
     model_doc = registry.find_one({
         "horizon": horizon,
-        "status": "production"
+        "status": "production",
+        "is_best": True
     })
 
     if not model_doc:
         raise RuntimeError(f"No production model found for horizon {horizon}")
+
+    if "gridfs_id" not in model_doc:
+        raise RuntimeError("Model does not contain gridfs_id")
 
     db = get_database()
     fs = GridFS(db)
