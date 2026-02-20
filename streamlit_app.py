@@ -26,6 +26,10 @@ st.markdown("---")
 # FETCH FORECAST FROM BACKEND
 # ==========================================================
 
+# ==========================================================
+# BACKEND API
+# ==========================================================
+
 FORECAST_URL = "https://web-production-382ce.up.railway.app/forecast"
 
 @st.cache_data(ttl=300)
@@ -33,14 +37,22 @@ def fetch_forecast():
     try:
         r = requests.get(FORECAST_URL, timeout=15)
         r.raise_for_status()
-        return r.json()
-    except requests.exceptions.RequestException as e:
+        data = r.json()
+
+        # validate expected keys
+        if all(k in data for k in ["1_day", "2_day", "3_day"]):
+            return data
+        else:
+            return None
+
+    except Exception as e:
         return None
+
 
 results = fetch_forecast()
 
 if results is None:
-    st.error("❌ Could not connect to backend API.")
+    st.error("❌ Backend API returned invalid data.")
     st.stop()
 
 # ==========================================================
