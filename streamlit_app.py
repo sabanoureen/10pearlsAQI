@@ -22,7 +22,7 @@ st.markdown("---")
 # BACKEND API URL (Railway)
 # ==========================================================
 
-API_URL = "https://web-production-382ce.up.railway.app/forecast"
+API_URL = "https://web-production-4267e.up.railway.app"
 
 # ==========================================================
 # REFRESH BUTTON
