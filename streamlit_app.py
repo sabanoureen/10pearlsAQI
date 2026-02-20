@@ -22,8 +22,7 @@ st.markdown("---")
 # BACKEND API URL (Railway)
 # ==========================================================
 
-import os
-API_URL = os.getenv("BACKEND_URL")
+API_URL = "https://web-production-382ce.up.railway.app"
 
 # ==========================================================
 # REFRESH BUTTON
