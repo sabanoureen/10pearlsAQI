@@ -5,6 +5,7 @@ Production-Grade MLOps System for Multi-Horizon Time Series Forecasting
 
 🔗 Live Streamlit App:
 https://10pearlsaqi-4gpbzmccfuqust2wshwqt.streamlit.app
+https://10pearlsaqi-4gpbzmccfuqust2wshwqt.streamlit.app/
 
 🔗 Production Backend API (Railway):
 https://web-production-382ce.up.railway.app
