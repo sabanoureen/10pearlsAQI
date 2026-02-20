@@ -22,7 +22,8 @@ st.markdown("---")
 # BACKEND API URL (Railway)
 # ==========================================================
 
-API_URL = "https://web-production-4267e.up.railway.app"
+import os
+API_URL = os.getenv("BACKEND_URL")
 
 # ==========================================================
 # REFRESH BUTTON
@@ -36,7 +37,7 @@ if st.button("🔄 Refresh Live Forecast"):
 # ==========================================================
 
 try:
-    response = requests.get(API_URL, timeout=10)
+    response = requests.get(f"{API_URL}/forecast", timeout=10)
 
     if response.status_code == 200:
         results = response.json()
