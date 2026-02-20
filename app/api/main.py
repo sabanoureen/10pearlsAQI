@@ -61,7 +61,7 @@ def get_latest_features(columns):
 # ---------------------------------------------------
 @app.get("/forecast/multi")
 def forecast_multi(horizon: int = 1):
-    model, features, _ = load_production_model(horizon)
+    model, features = load_production_model(horizon)
 
     X = get_latest_features(features)
 
@@ -155,3 +155,26 @@ def importance(horizon: int = 1):
     ]
 
     return {"status": "success", "features": data}
+# ---------------------------------------------------
+# Simple 3-Day Forecast (for Streamlit)
+# ---------------------------------------------------
+@app.get("/forecast")
+def forecast():
+    results = {}
+
+    for horizon in [1, 2, 3]:
+        model, features = load_production_model(horizon)
+        X = get_latest_features(features)
+
+        log_pred = model.predict(X)[0]
+        pred = float(np.expm1(log_pred))
+
+        future_date = (datetime.utcnow() + timedelta(days=horizon)).strftime("%Y-%m-%d")
+
+        results[f"{horizon}_day"] = {
+            "value": round(pred, 2),
+            "date": future_date,
+            "model": "random_forest"
+        }
+
+    return results
