@@ -22,30 +22,25 @@ st.markdown("---")
 # BACKEND API URL (Railway)
 # ==========================================================
 
-API_URL = "https://web-production-382ce.up.railway.app"
-
-# ==========================================================
-# REFRESH BUTTON
-# ==========================================================
-
-if st.button("🔄 Refresh Live Forecast"):
-    st.rerun()
-
-# ==========================================================
+A# ==========================================================
 # FETCH FORECAST FROM BACKEND
 # ==========================================================
 
-try:
-    response = requests.get(f"{API_URL}/forecast", timeout=10)
+FORECAST_URL = "https://web-production-382ce.up.railway.app/forecast"
 
-    if response.status_code == 200:
-        results = response.json()
-    else:
-        st.error("❌ Backend error. Please try again later.")
-        st.stop()
+@st.cache_data(ttl=300)
+def fetch_forecast():
+    try:
+        r = requests.get(FORECAST_URL, timeout=15)
+        r.raise_for_status()
+        return r.json()
+    except requests.exceptions.RequestException as e:
+        return None
 
-except Exception as e:
-    st.error("❌ Could not connect to backend.")
+results = fetch_forecast()
+
+if results is None:
+    st.error("❌ Could not connect to backend API.")
     st.stop()
 
 # ==========================================================
