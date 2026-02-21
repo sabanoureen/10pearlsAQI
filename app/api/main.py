@@ -45,7 +45,7 @@ def load_production_model(horizon: int):
 # Latest Feature Row
 # ---------------------------------------------------
 def get_latest_features(columns):
-    db = get_db()
+    db = get_database()
     col = db["historical_hourly_data"]
 
     doc = col.find_one({}, sort=[("datetime", -1)])
