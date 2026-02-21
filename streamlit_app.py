@@ -51,6 +51,8 @@ def fetch_forecast():
 
 results = fetch_forecast()
 
+st.write("Raw API Response:", results)
+
 if results is None:
     st.error("❌ Backend API returned invalid data.")
     st.stop()
