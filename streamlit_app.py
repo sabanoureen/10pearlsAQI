@@ -30,7 +30,7 @@ st.markdown("---")
 # BACKEND API
 # ==========================================================
 
-FORECAST_URL = "https://web-production-382ce.up.railway.app/forecast/"
+FORECAST_URL = "https://web-production-382ce.up.railway.app/forecast"
 
 @st.cache_data(ttl=300)
 def fetch_forecast():
