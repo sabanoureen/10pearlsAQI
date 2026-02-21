@@ -60,12 +60,16 @@ def train_all_models(X_train, y_train, X_val, y_val, horizon, run_id):
     from sklearn.linear_model import Ridge
     from xgboost import XGBRegressor
 
+    registry = get_model_registry()
+
     models = {
         "random_forest": RandomForestRegressor(n_estimators=200, random_state=42),
         "gradient_boosting": GradientBoostingRegressor(),
         "ridge": Ridge(),
         "xgboost": XGBRegressor(objective="reg:squarederror")
     }
+
+    results = []
 
     for name, model in models.items():
         print(f"\n🔹 Training {name} (H{horizon})")
@@ -78,13 +82,51 @@ def train_all_models(X_train, y_train, X_val, y_val, horizon, run_id):
 
         gridfs_id = save_model_to_gridfs(model, name, horizon)
 
-        register_model(
-            model_name=name,
-            horizon=horizon,
-            rmse=rmse,
-            mae=mae,
-            r2=r2,
-            gridfs_id=gridfs_id,
-            features=list(X_train.columns),
-            run_id=run_id
-        )
+        model_doc = {
+            "model_name": name,
+            "horizon": horizon,
+            "rmse": rmse,
+            "mae": mae,
+            "r2": r2,
+            "gridfs_id": gridfs_id,
+            "features": list(X_train.columns),
+            "run_id": run_id,
+            "status": "candidate",
+            "is_best": False,
+            "registered_at": datetime.utcnow()
+        }
+
+        registry.insert_one(model_doc)
+
+        results.append(model_doc)
+
+    # -------------------------------------------------
+    # Select Best Model (Lowest RMSE)
+    # -------------------------------------------------
+
+    best_model = min(results, key=lambda x: x["rmse"])
+
+    print(f"\n🏆 Best model for H{horizon}: {best_model['model_name']}")
+
+    # Archive previous production model
+    registry.update_many(
+        {"horizon": horizon, "status": "production"},
+        {"$set": {"status": "archived", "is_best": False}}
+    )
+
+    # Promote best model
+    registry.update_one(
+        {
+            "horizon": horizon,
+            "run_id": run_id,
+            "model_name": best_model["model_name"]
+        },
+        {
+            "$set": {
+                "status": "production",
+                "is_best": True
+            }
+        }
+    )
+
+    print("✅ Production model updated")
