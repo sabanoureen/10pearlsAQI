@@ -199,3 +199,8 @@ def forecast():
         }
 
     return results
+@app.get("/train/{horizon}")
+def train_model_endpoint(horizon: int):
+    from app.pipelines.training_pipeline import run_training
+    run_training(horizon)
+    return {"status": "training completed", "horizon": horizon}
