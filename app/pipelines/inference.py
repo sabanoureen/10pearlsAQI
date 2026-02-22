@@ -1,9 +1,18 @@
 import io
 import joblib
 from gridfs import GridFS
-from app.db.mongo import get_model_registry, get_database
+from datetime import datetime, timedelta
+
+from app.db.mongo import (
+    get_model_registry,
+    get_database,
+    get_feature_store
+)
 
 
+# -------------------------------------------------------
+# Load Production Model
+# -------------------------------------------------------
 def load_production_model(horizon: int):
 
     registry = get_model_registry()
@@ -27,3 +36,40 @@ def load_production_model(horizon: int):
     model = joblib.load(io.BytesIO(model_bytes))
 
     return model, model_doc["features"], model_doc["model_name"]
+
+
+# -------------------------------------------------------
+# Predict Next 3 Days
+# -------------------------------------------------------
+def predict_next_3_days():
+
+    results = {}
+
+    feature_store = get_feature_store()
+
+    latest_doc = feature_store.find_one(
+        sort=[("datetime", -1)]
+    )
+
+    if not latest_doc:
+        raise RuntimeError("No feature data available")
+
+    for horizon in [1, 2, 3]:
+
+        model, features, model_name = load_production_model(horizon)
+
+        latest_row = [latest_doc[f] for f in features]
+
+        prediction = model.predict([latest_row])[0]
+
+        future_date = (
+            datetime.utcnow() + timedelta(days=horizon)
+        ).strftime("%Y-%m-%d")
+
+        results[f"{horizon}_day"] = {
+            "value": round(float(prediction), 2),
+            "date": future_date,
+            "model": model_name
+        }
+
+    return results
