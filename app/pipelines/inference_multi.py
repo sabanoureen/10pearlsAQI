@@ -38,7 +38,7 @@ def predict_next_3_days():
 
     feature_store = get_feature_store()
 
-    # Get latest feature row
+    # Get latest feature document
     latest_doc = feature_store.find_one(
         sort=[("timestamp", -1)]
     )
