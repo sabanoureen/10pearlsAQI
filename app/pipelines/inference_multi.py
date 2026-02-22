@@ -30,20 +30,29 @@ def load_production_model(horizon):
     return model, model_doc["features"], model_doc["model_name"]
 
 
+from app.db.mongo import get_feature_store
+
 def predict_next_3_days():
 
     results = {}
 
-    for horizon in [1, 2, 3]:
+    feature_store = get_feature_store()
 
-        # IMPORTANT: unpack properly
-        df, _ = build_training_dataset(horizon)
+    # Get latest feature row
+    latest_doc = feature_store.find_one(
+        sort=[("timestamp", -1)]
+    )
+
+    if not latest_doc:
+        raise RuntimeError("No feature data available")
+
+    for horizon in [1, 2, 3]:
 
         model, features, model_name = load_production_model(horizon)
 
-        latest_row = df.iloc[-1][features].values.reshape(1, -1)
+        latest_row = [latest_doc[f] for f in features]
 
-        prediction = model.predict(latest_row)[0]
+        prediction = model.predict([latest_row])[0]
 
         future_date = (
             datetime.utcnow() + timedelta(days=horizon)
