@@ -9,7 +9,13 @@ MONGO_URI = os.getenv("MONGODB_URI")
 if not MONGO_URI:
     raise RuntimeError("❌ MONGODB_URI not set")
 
-client = MongoClient(MONGO_URI)
+client = MongoClient(
+    MONGO_URI,
+    serverSelectionTimeoutMS=30000,   # 30s server selection
+    connectTimeoutMS=30000,           # 30s connect timeout
+    socketTimeoutMS=None,             # NO socket timeout (important for GridFS)
+    maxPoolSize=50
+)
 
 # -----------------------------------------
 # Database
@@ -24,7 +30,7 @@ def get_db():
     return db
 
 
-def get_database():   # optional alias (safe for older imports)
+def get_database():
     return db
 
 
