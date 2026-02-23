@@ -99,7 +99,8 @@ def forecast():
 
     for horizon in [1, 2, 3]:
 
-        model, features, model_name = load_production_model(horizon)
+        model, features = load_production_model(horizon)
+
         X = get_latest_feature_row(features)
 
         prediction = float(model.predict(X)[0])
@@ -110,8 +111,7 @@ def forecast():
 
         results[f"{horizon}_day"] = {
             "value": round(prediction, 2),
-            "date": future_date,
-            "model": model_name
+            "date": future_date
         }
 
     return results
