@@ -13,10 +13,14 @@ from app.db.mongo import (
 )
 
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-MODEL_DIR = os.path.join(BASE_DIR, "models")
 
+MODEL_DIR = "models"
 os.makedirs(MODEL_DIR, exist_ok=True)
+
+model_path = os.path.join(MODEL_DIR, f"rf_h{horizon}.pkl")
+joblib.dump(model, model_path)
+
+print(f"Model saved to {model_path}")
 
 
 # ---------------------------------------------------

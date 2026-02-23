@@ -225,3 +225,20 @@ def feature_importance(horizon: int = 1):
 # ---------------------------------------------------
 # TRAIN ENDPOINT
 # ---------------------------------------------------
+# ---------------------------------------------------
+# TRAIN ENDPOINT (Railway Safe)
+# ---------------------------------------------------
+@app.get("/train/{horizon}")
+def train_endpoint(horizon: int):
+
+    if horizon not in [1, 2, 3]:
+        raise HTTPException(status_code=400, detail="Horizon must be 1, 2 or 3")
+
+    from app.pipelines.training_pipeline import run_training
+
+    run_training(horizon)
+
+    return {
+        "status": "success",
+        "message": f"Model trained inside Railway for horizon {horizon}"
+    }
