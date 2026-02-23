@@ -5,12 +5,10 @@ from datetime import datetime
 import joblib
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from gridfs import GridFS
 
 from app.pipelines.training_dataset import build_training_dataset
 from app.db.mongo import (
     get_model_registry,
-    get_database,
     get_feature_store
 )
 
@@ -58,44 +56,23 @@ def train_horizon(df, horizon: int):
     r2 = r2_score(y_test, preds)
 
     print(f"✅ Horizon {horizon} trained")
+    print("RMSE:", rmse)
+    print("MAE:", mae)
+    print("R2:", r2)
 
     # ---------------------------------------------------
-    # SAFE MODEL STORAGE (DELETE EVERYTHING FIRST)
+    # SIMPLE MODEL STORAGE (NO GRIDFS)
     # ---------------------------------------------------
-    db = get_database()
-    fs = GridFS(db)
+
     registry = get_model_registry()
 
-    # 🔥 DELETE ALL EXISTING GRIDFS FILES COMPLETELY
-    # ---------------------------------------------------
-# SAFE MODEL STORAGE (DELETE ONLY SAME HORIZON)
-# ---------------------------------------------------
-
-    db = get_database()
-    fs = GridFS(db)
-    registry = get_model_registry()
-
-# Delete only old models of THIS horizon
-    old_models = list(registry.find({"horizon": horizon}))
-
-    for old in old_models:
-        if "gridfs_id" in old:
-            try:
-                fs.delete(old["gridfs_id"])
-            except:
-                pass
-
+    # Delete old model of same horizon
     registry.delete_many({"horizon": horizon})
 
-    # Save new model
+    # Serialize model to binary
     buffer = io.BytesIO()
     joblib.dump(model, buffer)
-    buffer.seek(0)
-
-    file_id = fs.put(
-        buffer.read(),
-        filename=f"rf_h{horizon}"
-    )
+    model_bytes = buffer.getvalue()
 
     registry.insert_one({
         "model_name": "random_forest",
@@ -103,14 +80,14 @@ def train_horizon(df, horizon: int):
         "rmse": rmse,
         "mae": mae,
         "r2": r2,
-        "gridfs_id": file_id,
+        "model_binary": model_bytes,
         "features": feature_cols,
         "status": "production",
         "is_best": True,
         "registered_at": datetime.utcnow()
     })
 
-    print("📦 Model stored safely (old GridFS cleared)")
+    print("📦 Model stored directly in MongoDB (NO GridFS)")
 
 
 # ---------------------------------------------------
@@ -125,8 +102,9 @@ def run_training(horizon: int):
     print("Dataset shape:", df.shape)
 
     # ---------------------------------------------------
-    # FEATURE STORE = ONLY 1 ROW
+    # SAFE FEATURE STORE (ONLY LATEST ROW)
     # ---------------------------------------------------
+
     feature_store = get_feature_store()
 
     feature_columns = [
@@ -136,19 +114,22 @@ def run_training(horizon: int):
 
     latest_row = df[feature_columns].iloc[-1].to_dict()
 
+    # Convert pandas Timestamp to Python datetime
     if "datetime" in latest_row:
         latest_row["datetime"] = latest_row["datetime"].to_pydatetime()
 
+    # Keep only 1 row
     feature_store.delete_many({})
     feature_store.insert_one(latest_row)
 
     print("📦 Feature store updated (1 row only)")
 
+    # Train model
     train_horizon(df, horizon)
 
 
 # ---------------------------------------------------
-# CLI
+# CLI ENTRY
 # ---------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
