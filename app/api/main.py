@@ -66,6 +66,7 @@ def load_production_model(horizon: int):
 # ---------------------------------------------------
 # GET LATEST FEATURE ROW (FROM FEATURE STORE)
 # ---------------------------------------------------
+
 def get_latest_feature_row(feature_columns):
 
     feature_store = get_feature_store()
@@ -80,17 +81,22 @@ def get_latest_feature_row(feature_columns):
             detail="Feature store empty. Run training first."
         )
 
-    try:
-        row = [latest_doc[col] for col in feature_columns]
-    except KeyError as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Missing feature column in feature_store: {e}"
-        )
+    # Build dictionary using EXACT training features
+    row_dict = {}
 
-    return np.array(row).reshape(1, -1)
+    for col in feature_columns:
+        if col not in latest_doc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Missing feature column in feature_store: {col}"
+            )
+        row_dict[col] = latest_doc[col]
 
+    # Convert to DataFrame (important!)
+    import pandas as pd
+    X = pd.DataFrame([row_dict])
 
+    return X
 # ---------------------------------------------------
 # SIMPLE 3-DAY FORECAST (for Streamlit)
 # ---------------------------------------------------
