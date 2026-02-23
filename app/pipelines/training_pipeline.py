@@ -45,8 +45,7 @@ def train_horizon(df, horizon: int):
     y_train, y_test = y[:split_index], y[split_index:]
 
     model = RandomForestRegressor(
-        n_estimators=80,
-        max_depth=10,
+        n_estimators=200,
         random_state=42
     )
 
@@ -59,28 +58,23 @@ def train_horizon(df, horizon: int):
     r2 = r2_score(y_test, preds)
 
     print(f"✅ Horizon {horizon} trained")
-    print("RMSE:", rmse)
-    print("MAE:", mae)
-    print("R2:", r2)
 
     # ---------------------------------------------------
-    # SAFE MODEL STORAGE (AUTO CLEAN OLD MODELS)
+    # SAFE MODEL STORAGE (DELETE EVERYTHING FIRST)
     # ---------------------------------------------------
     db = get_database()
     fs = GridFS(db)
     registry = get_model_registry()
 
-    # 🔥 Delete old models + GridFS files for this horizon
-    old_models = list(registry.find({"horizon": horizon}))
+    # 🔥 DELETE ALL EXISTING GRIDFS FILES COMPLETELY
+    for file in db.fs.files.find():
+        try:
+            fs.delete(file["_id"])
+        except:
+            pass
 
-    for old in old_models:
-        if "gridfs_id" in old:
-            try:
-                fs.delete(old["gridfs_id"])
-            except:
-                pass
-
-    registry.delete_many({"horizon": horizon})
+    # 🔥 CLEAR REGISTRY
+    registry.delete_many({})
 
     # Save new model
     buffer = io.BytesIO()
@@ -105,7 +99,7 @@ def train_horizon(df, horizon: int):
         "registered_at": datetime.utcnow()
     })
 
-    print("📦 Model registered safely (old models removed)")
+    print("📦 Model stored safely (old GridFS cleared)")
 
 
 # ---------------------------------------------------
@@ -120,7 +114,7 @@ def run_training(horizon: int):
     print("Dataset shape:", df.shape)
 
     # ---------------------------------------------------
-    # SAFE FEATURE STORE (ONLY LATEST ROW)
+    # FEATURE STORE = ONLY 1 ROW
     # ---------------------------------------------------
     feature_store = get_feature_store()
 
@@ -131,19 +125,14 @@ def run_training(horizon: int):
 
     latest_row = df[feature_columns].iloc[-1].to_dict()
 
-    # Convert pandas Timestamp to Python datetime
     if "datetime" in latest_row:
         latest_row["datetime"] = latest_row["datetime"].to_pydatetime()
 
-    # Keep only 1 document
     feature_store.delete_many({})
     feature_store.insert_one(latest_row)
 
-    print("📦 Feature store updated with latest row only")
+    print("📦 Feature store updated (1 row only)")
 
-    # ---------------------------------------------------
-    # Train Model
-    # ---------------------------------------------------
     train_horizon(df, horizon)
 
 
