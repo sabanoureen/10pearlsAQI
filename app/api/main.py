@@ -46,6 +46,10 @@ def load_production_model(horizon: int):
 
     model_path = doc["model_path"]
 
+    if not os.path.isabs(model_path):
+        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        model_path = os.path.join(BASE_DIR, model_path)
+
     if not os.path.exists(model_path):
         raise HTTPException(status_code=500, detail="Model file not found on disk")
 

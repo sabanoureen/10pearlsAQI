@@ -12,7 +12,10 @@ from app.db.mongo import (
     get_feature_store
 )
 
-MODEL_DIR = "models"
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+MODEL_DIR = os.path.join(BASE_DIR, "models")
+
 os.makedirs(MODEL_DIR, exist_ok=True)
 
 
@@ -68,7 +71,6 @@ def train_horizon(df, horizon: int):
     # ---------------------------------------------------
 
     model_path = os.path.join(MODEL_DIR, f"rf_h{horizon}.pkl")
-    joblib.dump(model, model_path)
 
     print(f"📦 Model saved to disk: {model_path}")
 

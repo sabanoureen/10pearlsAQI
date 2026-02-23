@@ -25,7 +25,6 @@ db/
 !app/db/**
 
 historical_data.csv
-models/
 __pycache__/
 *.pyc
 historical_data.csv
