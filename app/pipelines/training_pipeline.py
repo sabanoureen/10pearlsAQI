@@ -15,9 +15,9 @@ from app.db.mongo import (
 )
 
 
-# -------------------------------------------
+# ---------------------------------------------------
 # Train One Horizon
-# -------------------------------------------
+# ---------------------------------------------------
 def train_horizon(df, horizon: int):
 
     target_column = f"target_h{horizon}"
@@ -62,27 +62,33 @@ def train_horizon(df, horizon: int):
     print("MAE:", mae)
     print("R2:", r2)
 
-    # -------------------------------------------
-    # SAVE MODEL TO GRIDFS
-    # -------------------------------------------
+    # ---------------------------------------------------
+    # SAFE MODEL STORAGE (AUTO CLEAN OLD MODELS)
+    # ---------------------------------------------------
     db = get_database()
     fs = GridFS(db)
+    registry = get_model_registry()
 
+    # 🔥 Delete old models + GridFS files for this horizon
+    old_models = list(registry.find({"horizon": horizon}))
+
+    for old in old_models:
+        if "gridfs_id" in old:
+            try:
+                fs.delete(old["gridfs_id"])
+            except:
+                pass
+
+    registry.delete_many({"horizon": horizon})
+
+    # Save new model
     buffer = io.BytesIO()
     joblib.dump(model, buffer)
     buffer.seek(0)
 
     file_id = fs.put(
         buffer.read(),
-        filename=f"rf_h{horizon}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
-    )
-
-    registry = get_model_registry()
-
-    # Archive old production models
-    registry.update_many(
-        {"horizon": horizon, "status": "production"},
-        {"$set": {"status": "archived", "is_best": False}}
+        filename=f"rf_h{horizon}"
     )
 
     registry.insert_one({
@@ -98,12 +104,12 @@ def train_horizon(df, horizon: int):
         "registered_at": datetime.utcnow()
     })
 
-    print("📦 Model registered")
+    print("📦 Model registered safely (old models removed)")
 
 
-# -------------------------------------------
+# ---------------------------------------------------
 # Run Training
-# -------------------------------------------
+# ---------------------------------------------------
 def run_training(horizon: int):
 
     print("🔥 Starting Daily Training Pipeline")
@@ -112,9 +118,9 @@ def run_training(horizon: int):
 
     print("Dataset shape:", df.shape)
 
-    # -------------------------------------------
-    # POPULATE FEATURE STORE
-    # -------------------------------------------
+    # ---------------------------------------------------
+    # SAFE FEATURE STORE (ONLY LATEST ROW)
+    # ---------------------------------------------------
     feature_store = get_feature_store()
 
     feature_columns = [
@@ -122,32 +128,27 @@ def run_training(horizon: int):
         if not col.startswith("target_")
     ]
 
-    feature_df = df[feature_columns].copy()
+    latest_row = df[feature_columns].iloc[-1].to_dict()
 
-    # Convert pandas Timestamp → Python datetime
-    if "datetime" in feature_df.columns:
-        feature_df["datetime"] = feature_df["datetime"].apply(
-            lambda x: x.to_pydatetime()
-        )
+    # Convert pandas Timestamp to Python datetime
+    if "datetime" in latest_row:
+        latest_row["datetime"] = latest_row["datetime"].to_pydatetime()
 
-    feature_docs = feature_df.to_dict(orient="records")
-
+    # Keep only 1 document
     feature_store.delete_many({})
+    feature_store.insert_one(latest_row)
 
-    if feature_docs:
-        feature_store.insert_many(feature_docs)
+    print("📦 Feature store updated with latest row only")
 
-    print(f"📦 Feature store populated with {len(feature_docs)} rows")
-
-    # -------------------------------------------
+    # ---------------------------------------------------
     # Train Model
-    # -------------------------------------------
+    # ---------------------------------------------------
     train_horizon(df, horizon)
 
 
-# -------------------------------------------
+# ---------------------------------------------------
 # CLI
-# -------------------------------------------
+# ---------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--horizon", type=int, required=True)
