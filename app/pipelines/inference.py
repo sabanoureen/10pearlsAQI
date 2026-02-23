@@ -1,8 +1,13 @@
+import argparse
 import io
-import joblib
-from gridfs import GridFS
-from datetime import datetime, timedelta
+from datetime import datetime
 
+import joblib
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from gridfs import GridFS
+
+from app.pipelines.training_dataset import build_training_dataset
 from app.db.mongo import (
     get_model_registry,
     get_database,
@@ -10,66 +15,138 @@ from app.db.mongo import (
 )
 
 
-# -------------------------------------------------------
-# Load Production Model
-# -------------------------------------------------------
-def load_production_model(horizon: int):
+# -------------------------------------------
+# Train One Horizon
+# -------------------------------------------
+def train_horizon(df, horizon: int):
 
-    registry = get_model_registry()
+    target_column = f"target_h{horizon}"
 
-    model_doc = registry.find_one({
-        "horizon": horizon,
-        "status": "production",
-        "is_best": True
-    })
+    if target_column not in df.columns:
+        raise RuntimeError(f"Missing target column: {target_column}")
 
-    if not model_doc:
-        raise RuntimeError(f"No production model found for horizon {horizon}")
+    feature_cols = [
+        "hour",
+        "day",
+        "month",
+        "lag_1",
+        "lag_3",
+        "lag_6",
+        "roll_mean_6",
+        "roll_mean_12",
+    ]
 
-    if "gridfs_id" not in model_doc:
-        raise RuntimeError("Model does not contain gridfs_id")
+    X = df[feature_cols]
+    y = df[target_column]
 
+    split_index = int(len(df) * 0.8)
+
+    X_train, X_test = X[:split_index], X[split_index:]
+    y_train, y_test = y[:split_index], y[split_index:]
+
+    model = RandomForestRegressor(
+        n_estimators=200,
+        random_state=42
+    )
+
+    model.fit(X_train, y_train)
+
+    preds = model.predict(X_test)
+
+    rmse = mean_squared_error(y_test, preds, squared=False)
+    mae = mean_absolute_error(y_test, preds)
+    r2 = r2_score(y_test, preds)
+
+    print(f"✅ Horizon {horizon} trained")
+    print("RMSE:", rmse)
+    print("MAE:", mae)
+    print("R2:", r2)
+
+    # -------------------------------------------
+    # Save Model to GridFS
+    # -------------------------------------------
     db = get_database()
     fs = GridFS(db)
 
-    model_bytes = fs.get(model_doc["gridfs_id"]).read()
-    model = joblib.load(io.BytesIO(model_bytes))
+    buffer = io.BytesIO()
+    joblib.dump(model, buffer)
+    buffer.seek(0)
 
-    return model, model_doc["features"], model_doc["model_name"]
-
-
-# -------------------------------------------------------
-# Predict Next 3 Days
-# -------------------------------------------------------
-def predict_next_3_days():
-
-    results = {}
-
-    feature_store = get_feature_store()
-
-    latest_doc = feature_store.find_one(
-        sort=[("datetime", -1)]
+    file_id = fs.put(
+        buffer.read(),
+        filename=f"rf_h{horizon}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
     )
 
-    if not latest_doc:
-        raise RuntimeError("No feature data available")
+    print("📁 Model stored in GridFS")
 
-    for horizon in [1, 2, 3]:
+    # -------------------------------------------
+    # Register Model
+    # -------------------------------------------
+    registry = get_model_registry()
 
-        model, features, model_name = load_production_model(horizon)
+    registry.update_many(
+        {"horizon": horizon, "status": "production"},
+        {"$set": {"status": "archived", "is_best": False}}
+    )
 
-        latest_row = [latest_doc[f] for f in features]
+    registry.insert_one({
+        "model_name": "random_forest",
+        "horizon": horizon,
+        "rmse": rmse,
+        "mae": mae,
+        "r2": r2,
+        "gridfs_id": file_id,
+        "features": feature_cols,
+        "status": "production",
+        "is_best": True,
+        "registered_at": datetime.utcnow()
+    })
 
-        prediction = model.predict([latest_row])[0]
+    print("📦 Model registered in MongoDB")
 
-        future_date = (
-            datetime.utcnow() + timedelta(days=horizon)
-        ).strftime("%Y-%m-%d")
 
-        results[f"{horizon}_day"] = {
-            "value": round(float(prediction), 2),
-            "date": future_date,
-            "model": model_name
-        }
+# -------------------------------------------
+# Run Training
+# -------------------------------------------
+def run_training(horizon: int):
 
-    return results
+    print("🔥 Starting Daily Training Pipeline")
+
+    df = build_training_dataset()
+
+    print("✅ Training dataset built:", df.shape)
+
+    # -------------------------------------------
+    # Populate Feature Store
+    # -------------------------------------------
+    feature_store = get_feature_store()
+
+    feature_columns = [
+        col for col in df.columns
+        if not col.startswith("target_")
+    ]
+
+    feature_docs = df[feature_columns].to_dict(orient="records")
+
+    feature_store.delete_many({})
+
+    if feature_docs:
+        feature_store.insert_many(feature_docs)
+
+    print(f"📦 Feature store populated: {len(feature_docs)} documents")
+
+    # -------------------------------------------
+    # Train model
+    # -------------------------------------------
+    train_horizon(df, horizon)
+
+
+# -------------------------------------------
+# CLI Entry
+# -------------------------------------------
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--horizon", type=int, required=True)
+    args = parser.parse_args()
+
+    run_training(args.horizon)
