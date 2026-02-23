@@ -1,5 +1,5 @@
 import argparse
-import io
+import os
 from datetime import datetime
 
 import joblib
@@ -11,6 +11,9 @@ from app.db.mongo import (
     get_model_registry,
     get_feature_store
 )
+
+MODEL_DIR = "models"
+os.makedirs(MODEL_DIR, exist_ok=True)
 
 
 # ---------------------------------------------------
@@ -61,18 +64,21 @@ def train_horizon(df, horizon: int):
     print("R2:", r2)
 
     # ---------------------------------------------------
-    # SIMPLE MODEL STORAGE (NO GRIDFS)
+    # SAVE MODEL TO DISK (NOT MONGODB)
+    # ---------------------------------------------------
+
+    model_path = os.path.join(MODEL_DIR, f"rf_h{horizon}.pkl")
+    joblib.dump(model, model_path)
+
+    print(f"📦 Model saved to disk: {model_path}")
+
+    # ---------------------------------------------------
+    # SAVE METADATA TO MONGODB
     # ---------------------------------------------------
 
     registry = get_model_registry()
 
-    # Delete old model of same horizon
     registry.delete_many({"horizon": horizon})
-
-    # Serialize model to binary
-    buffer = io.BytesIO()
-    joblib.dump(model, buffer)
-    model_bytes = buffer.getvalue()
 
     registry.insert_one({
         "model_name": "random_forest",
@@ -80,14 +86,14 @@ def train_horizon(df, horizon: int):
         "rmse": rmse,
         "mae": mae,
         "r2": r2,
-        "model_binary": model_bytes,
+        "model_path": model_path,
         "features": feature_cols,
         "status": "production",
         "is_best": True,
         "registered_at": datetime.utcnow()
     })
 
-    print("📦 Model stored directly in MongoDB (NO GridFS)")
+    print("📦 Model metadata stored in MongoDB")
 
 
 # ---------------------------------------------------
@@ -102,7 +108,7 @@ def run_training(horizon: int):
     print("Dataset shape:", df.shape)
 
     # ---------------------------------------------------
-    # SAFE FEATURE STORE (ONLY LATEST ROW)
+    # FEATURE STORE (1 ROW ONLY)
     # ---------------------------------------------------
 
     feature_store = get_feature_store()
@@ -114,22 +120,19 @@ def run_training(horizon: int):
 
     latest_row = df[feature_columns].iloc[-1].to_dict()
 
-    # Convert pandas Timestamp to Python datetime
     if "datetime" in latest_row:
         latest_row["datetime"] = latest_row["datetime"].to_pydatetime()
 
-    # Keep only 1 row
     feature_store.delete_many({})
     feature_store.insert_one(latest_row)
 
     print("📦 Feature store updated (1 row only)")
 
-    # Train model
     train_horizon(df, horizon)
 
 
 # ---------------------------------------------------
-# CLI ENTRY
+# CLI
 # ---------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

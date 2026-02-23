@@ -29,6 +29,9 @@ def health():
 # ---------------------------------------------------
 # LOAD PRODUCTION MODEL (GridFS)
 # ---------------------------------------------------
+import os
+import joblib
+
 def load_production_model(horizon: int):
 
     registry = get_model_registry()
@@ -41,12 +44,12 @@ def load_production_model(horizon: int):
     if not doc:
         raise HTTPException(status_code=404, detail="No production model found")
 
-    try:
-        model_bytes = doc["model_binary"]
-        buffer = io.BytesIO(model_bytes)
-        model = joblib.load(buffer)
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to load model")
+    model_path = doc["model_path"]
+
+    if not os.path.exists(model_path):
+        raise HTTPException(status_code=500, detail="Model file not found on disk")
+
+    model = joblib.load(model_path)
 
     return model, doc["features"]
 
