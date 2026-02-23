@@ -1,148 +1,114 @@
-import argparse
 import os
+import joblib
 from datetime import datetime
 
-import joblib
+import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
 from app.pipelines.training_dataset import build_training_dataset
-from app.db.mongo import (
-    get_model_registry,
-    get_feature_store
-)
-
-
-
-MODEL_DIR = "models"
-os.makedirs(MODEL_DIR, exist_ok=True)
-
-model_path = os.path.join(MODEL_DIR, f"rf_h{horizon}.pkl")
-joblib.dump(model, model_path)
-
-print(f"Model saved to {model_path}")
+from app.db.mongo import get_model_registry
 
 
 # ---------------------------------------------------
-# Train One Horizon
+# TRAIN SINGLE HORIZON
 # ---------------------------------------------------
-def train_horizon(df, horizon: int):
+def train_horizon(df: pd.DataFrame, horizon: int):
 
-    target_column = f"target_h{horizon}"
+    print(f"🔥 Starting training for horizon {horizon}")
 
-    if target_column not in df.columns:
-        raise RuntimeError(f"Missing target column: {target_column}")
+    # Target column
+    target_col = f"target_h{horizon}"
 
-    feature_cols = [
-        "hour",
-        "day",
-        "month",
-        "lag_1",
-        "lag_3",
-        "lag_6",
-        "roll_mean_6",
-        "roll_mean_12",
-    ]
+    if target_col not in df.columns:
+        raise ValueError(f"{target_col} not found in dataset")
 
-    X = df[feature_cols]
-    y = df[target_column]
+    X = df.drop(columns=["datetime", "target_h1", "target_h2", "target_h3"])
+    y = df[target_col]
 
-    split_index = int(len(df) * 0.8)
-
-    X_train, X_test = X[:split_index], X[split_index:]
-    y_train, y_test = y[:split_index], y[split_index:]
-
+    # Train model
     model = RandomForestRegressor(
         n_estimators=200,
-        random_state=42
+        max_depth=10,
+        random_state=42,
+        n_jobs=-1
     )
 
-    model.fit(X_train, y_train)
+    model.fit(X, y)
 
-    preds = model.predict(X_test)
+    # Predictions for metrics
+    preds = model.predict(X)
 
-    rmse = mean_squared_error(y_test, preds, squared=False)
-    mae = mean_absolute_error(y_test, preds)
-    r2 = r2_score(y_test, preds)
+    rmse = mean_squared_error(y, preds, squared=False)
+    mae = mean_absolute_error(y, preds)
+    r2 = r2_score(y, preds)
 
-    print(f"✅ Horizon {horizon} trained")
+    print("✅ Model trained")
     print("RMSE:", rmse)
     print("MAE:", mae)
     print("R2:", r2)
 
     # ---------------------------------------------------
-    # SAVE MODEL TO DISK (NOT MONGODB)
+    # SAVE MODEL TO DISK (Railway container)
     # ---------------------------------------------------
+    MODEL_DIR = "models"
+    os.makedirs(MODEL_DIR, exist_ok=True)
 
     model_path = os.path.join(MODEL_DIR, f"rf_h{horizon}.pkl")
+    joblib.dump(model, model_path)
 
-    print(f"📦 Model saved to disk: {model_path}")
+    print(f"💾 Model saved to {model_path}")
 
     # ---------------------------------------------------
-    # SAVE METADATA TO MONGODB
+    # REGISTER METADATA IN MONGO
     # ---------------------------------------------------
-
     registry = get_model_registry()
 
-    registry.delete_many({"horizon": horizon})
+    # Remove old best model for this horizon
+    registry.update_many(
+        {"horizon": horizon},
+        {"$set": {"is_best": False}}
+    )
 
     registry.insert_one({
-        "model_name": "random_forest",
+        "model_name": f"rf_h{horizon}",
         "horizon": horizon,
-        "rmse": rmse,
-        "mae": mae,
-        "r2": r2,
         "model_path": model_path,
-        "features": feature_cols,
-        "status": "production",
+        "features": list(X.columns),
+        "rmse": float(rmse),
+        "mae": float(mae),
+        "r2": float(r2),
+        "created_at": datetime.utcnow(),
         "is_best": True,
-        "registered_at": datetime.utcnow()
+        "status": "production"
     })
 
-    print("📦 Model metadata stored in MongoDB")
+    print("📦 Model metadata stored in Mongo")
+
+    return {
+        "horizon": horizon,
+        "rmse": float(rmse),
+        "mae": float(mae),
+        "r2": float(r2)
+    }
 
 
 # ---------------------------------------------------
-# Run Training
+# RUN TRAINING PIPELINE
 # ---------------------------------------------------
 def run_training(horizon: int):
 
-    print("🔥 Starting Daily Training Pipeline")
+    if horizon not in [1, 2, 3]:
+        raise ValueError("Horizon must be 1, 2, or 3")
+
+    print("🚀 Building training dataset")
 
     df = build_training_dataset()
 
     print("Dataset shape:", df.shape)
 
-    # ---------------------------------------------------
-    # FEATURE STORE (1 ROW ONLY)
-    # ---------------------------------------------------
+    result = train_horizon(df, horizon)
 
-    feature_store = get_feature_store()
+    print("🎯 Training completed successfully")
 
-    feature_columns = [
-        col for col in df.columns
-        if not col.startswith("target_")
-    ]
-
-    latest_row = df[feature_columns].iloc[-1].to_dict()
-
-    if "datetime" in latest_row:
-        latest_row["datetime"] = latest_row["datetime"].to_pydatetime()
-
-    feature_store.delete_many({})
-    feature_store.insert_one(latest_row)
-
-    print("📦 Feature store updated (1 row only)")
-
-    train_horizon(df, horizon)
-
-
-# ---------------------------------------------------
-# CLI
-# ---------------------------------------------------
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--horizon", type=int, required=True)
-    args = parser.parse_args()
-
-    run_training(args.horizon)
+    return result
