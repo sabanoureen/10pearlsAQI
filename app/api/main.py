@@ -29,40 +29,32 @@ def health():
 # ---------------------------------------------------
 # LOAD PRODUCTION MODEL (GridFS)
 # ---------------------------------------------------
-import os
-import joblib
+from gridfs import GridFS
+import io
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-MODEL_DIR = os.path.join(BASE_DIR, "models")
 
 def load_production_model(horizon: int):
 
-    model_path = os.path.join(MODEL_DIR, f"rf_h{horizon}.pkl")
+    registry = get_model_registry()
+    db = get_database()
+    fs = GridFS(db)
 
-    if not os.path.exists(model_path):
-        raise HTTPException(
-            status_code=500,
-            detail=f"Model file not found at {model_path}"
-        )
+    doc = registry.find_one({
+        "horizon": horizon,
+        "is_best": True
+    })
 
-    model = joblib.load(model_path)
+    if not doc:
+        raise HTTPException(status_code=404, detail="No production model found")
 
-    # Since features are same for all models, hardcode or load from registry if needed
-    feature_columns = [
-        "hour",
-        "day",
-        "month",
-        "lag_1",
-        "lag_3",
-        "lag_6",
-        "roll_mean_6",
-        "roll_mean_12",
-    ]
+    if "gridfs_id" not in doc:
+        raise HTTPException(status_code=500, detail="Model not stored in GridFS")
 
-    model_name = f"RandomForest_h{horizon}"
+    model_bytes = fs.get(doc["gridfs_id"]).read()
 
-    return model, feature_columns, model_name
+    model = joblib.load(io.BytesIO(model_bytes))
 
+    return model, doc["features"]
 # ---------------------------------------------------
 # GET LATEST FEATURE ROW (FROM FEATURE STORE)
 # ---------------------------------------------------

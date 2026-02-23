@@ -1,13 +1,14 @@
-import os
+import io
 import joblib
 from datetime import datetime
 
 import pandas as pd
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from gridfs import GridFS
 
 from app.pipelines.training_dataset import build_training_dataset
-from app.db.mongo import get_model_registry
+from app.db.mongo import get_model_registry, get_database
 
 
 # ---------------------------------------------------
@@ -17,7 +18,6 @@ def train_horizon(df: pd.DataFrame, horizon: int):
 
     print(f"🔥 Starting training for horizon {horizon}")
 
-    # Target column
     target_col = f"target_h{horizon}"
 
     if target_col not in df.columns:
@@ -26,7 +26,6 @@ def train_horizon(df: pd.DataFrame, horizon: int):
     X = df.drop(columns=["datetime", "target_h1", "target_h2", "target_h3"])
     y = df[target_col]
 
-    # Train model
     model = RandomForestRegressor(
         n_estimators=200,
         max_depth=10,
@@ -36,7 +35,6 @@ def train_horizon(df: pd.DataFrame, horizon: int):
 
     model.fit(X, y)
 
-    # Predictions for metrics
     preds = model.predict(X)
 
     rmse = mean_squared_error(y, preds, squared=False)
@@ -49,22 +47,32 @@ def train_horizon(df: pd.DataFrame, horizon: int):
     print("R2:", r2)
 
     # ---------------------------------------------------
-    # SAVE MODEL TO DISK (Railway container)
+    # STORE MODEL IN GRIDFS
     # ---------------------------------------------------
-    MODEL_DIR = "models"
-    os.makedirs(MODEL_DIR, exist_ok=True)
-
-    model_path = os.path.join(MODEL_DIR, f"rf_h{horizon}.pkl")
-    joblib.dump(model, model_path)
-
-    print(f"💾 Model saved to {model_path}")
-
-    # ---------------------------------------------------
-    # REGISTER METADATA IN MONGO
-    # ---------------------------------------------------
+    db = get_database()
+    fs = GridFS(db)
     registry = get_model_registry()
 
-    # Remove old best model for this horizon
+    # Serialize model
+    buffer = io.BytesIO()
+    joblib.dump(model, buffer)
+    buffer.seek(0)
+
+    # Remove old model for this horizon
+    old_models = registry.find({"horizon": horizon})
+    for doc in old_models:
+        if "gridfs_id" in doc:
+            fs.delete(doc["gridfs_id"])
+
+    # Save new model
+    file_id = fs.put(
+        buffer.read(),
+        filename=f"rf_h{horizon}.pkl"
+    )
+
+    print("💾 Model stored in GridFS")
+
+    # Remove old best flag
     registry.update_many(
         {"horizon": horizon},
         {"$set": {"is_best": False}}
@@ -73,7 +81,7 @@ def train_horizon(df: pd.DataFrame, horizon: int):
     registry.insert_one({
         "model_name": f"rf_h{horizon}",
         "horizon": horizon,
-        "model_path": model_path,
+        "gridfs_id": file_id,
         "features": list(X.columns),
         "rmse": float(rmse),
         "mae": float(mae),
