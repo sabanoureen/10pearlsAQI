@@ -67,14 +67,25 @@ def train_horizon(df, horizon: int):
     registry = get_model_registry()
 
     # 🔥 DELETE ALL EXISTING GRIDFS FILES COMPLETELY
-    for file in db.fs.files.find():
-        try:
-            fs.delete(file["_id"])
-        except:
-            pass
+    # ---------------------------------------------------
+# SAFE MODEL STORAGE (DELETE ONLY SAME HORIZON)
+# ---------------------------------------------------
 
-    # 🔥 CLEAR REGISTRY
-    registry.delete_many({})
+    db = get_database()
+    fs = GridFS(db)
+    registry = get_model_registry()
+
+# Delete only old models of THIS horizon
+    old_models = list(registry.find({"horizon": horizon}))
+
+    for old in old_models:
+        if "gridfs_id" in old:
+            try:
+                fs.delete(old["gridfs_id"])
+            except:
+                pass
+
+    registry.delete_many({"horizon": horizon})
 
     # Save new model
     buffer = io.BytesIO()
