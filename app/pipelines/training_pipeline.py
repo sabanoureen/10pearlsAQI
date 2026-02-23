@@ -105,28 +105,32 @@ def run_training(horizon: int):
     # -------------------------------------------
     # POPULATE FEATURE STORE
     # -------------------------------------------
-    feature_store = get_feature_store()
-
-    feature_columns = [
-        col for col in df.columns
-        if not col.startswith("target_")
-    ]
-
-    feature_docs = df[feature_columns].to_dict(orient="records")
-
-    feature_store.delete_many({})  # clear old
-
-    if feature_docs:
-        feature_store.insert_many(feature_docs)
-
-    print(f"📦 Feature store populated with {len(feature_docs)} rows")
-
     # -------------------------------------------
-    # TRAIN MODEL
-    # -------------------------------------------
-    train_horizon(df, horizon)
+# POPULATE FEATURE STORE (FIXED VERSION)
+# -------------------------------------------
+feature_store = get_feature_store()
 
+feature_columns = [
+    col for col in df.columns
+    if not col.startswith("target_")
+]
 
+feature_df = df[feature_columns].copy()
+
+# 🔥 Convert pandas Timestamp to Python datetime
+if "datetime" in feature_df.columns:
+    feature_df["datetime"] = feature_df["datetime"].apply(
+        lambda x: x.to_pydatetime()
+    )
+
+feature_docs = feature_df.to_dict(orient="records")
+
+feature_store.delete_many({})
+
+if feature_docs:
+    feature_store.insert_many(feature_docs)
+
+print(f"📦 Feature store populated with {len(feature_docs)} rows")
 # -------------------------------------------
 # CLI
 # -------------------------------------------
