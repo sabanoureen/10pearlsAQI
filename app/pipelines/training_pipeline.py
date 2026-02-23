@@ -45,7 +45,8 @@ def train_horizon(df, horizon: int):
     y_train, y_test = y[:split_index], y[split_index:]
 
     model = RandomForestRegressor(
-        n_estimators=200,
+        n_estimators=80,
+        max_depth=10,
         random_state=42
     )
 
