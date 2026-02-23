@@ -22,6 +22,9 @@ def train_horizon(df, horizon: int):
 
     target_column = f"target_h{horizon}"
 
+    if target_column not in df.columns:
+        raise RuntimeError(f"Missing target column: {target_column}")
+
     feature_cols = [
         "hour",
         "day",
@@ -55,9 +58,12 @@ def train_horizon(df, horizon: int):
     r2 = r2_score(y_test, preds)
 
     print(f"✅ Horizon {horizon} trained")
+    print("RMSE:", rmse)
+    print("MAE:", mae)
+    print("R2:", r2)
 
     # -------------------------------------------
-    # SAVE MODEL
+    # SAVE MODEL TO GRIDFS
     # -------------------------------------------
     db = get_database()
     fs = GridFS(db)
@@ -66,10 +72,14 @@ def train_horizon(df, horizon: int):
     joblib.dump(model, buffer)
     buffer.seek(0)
 
-    file_id = fs.put(buffer.read())
+    file_id = fs.put(
+        buffer.read(),
+        filename=f"rf_h{horizon}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    )
 
     registry = get_model_registry()
 
+    # Archive old production models
     registry.update_many(
         {"horizon": horizon, "status": "production"},
         {"$set": {"status": "archived", "is_best": False}}
@@ -105,32 +115,36 @@ def run_training(horizon: int):
     # -------------------------------------------
     # POPULATE FEATURE STORE
     # -------------------------------------------
+    feature_store = get_feature_store()
+
+    feature_columns = [
+        col for col in df.columns
+        if not col.startswith("target_")
+    ]
+
+    feature_df = df[feature_columns].copy()
+
+    # Convert pandas Timestamp → Python datetime
+    if "datetime" in feature_df.columns:
+        feature_df["datetime"] = feature_df["datetime"].apply(
+            lambda x: x.to_pydatetime()
+        )
+
+    feature_docs = feature_df.to_dict(orient="records")
+
+    feature_store.delete_many({})
+
+    if feature_docs:
+        feature_store.insert_many(feature_docs)
+
+    print(f"📦 Feature store populated with {len(feature_docs)} rows")
+
     # -------------------------------------------
-# POPULATE FEATURE STORE (FIXED VERSION)
-# -------------------------------------------
-feature_store = get_feature_store()
+    # Train Model
+    # -------------------------------------------
+    train_horizon(df, horizon)
 
-feature_columns = [
-    col for col in df.columns
-    if not col.startswith("target_")
-]
 
-feature_df = df[feature_columns].copy()
-
-# 🔥 Convert pandas Timestamp to Python datetime
-if "datetime" in feature_df.columns:
-    feature_df["datetime"] = feature_df["datetime"].apply(
-        lambda x: x.to_pydatetime()
-    )
-
-feature_docs = feature_df.to_dict(orient="records")
-
-feature_store.delete_many({})
-
-if feature_docs:
-    feature_store.insert_many(feature_docs)
-
-print(f"📦 Feature store populated with {len(feature_docs)} rows")
 # -------------------------------------------
 # CLI
 # -------------------------------------------
