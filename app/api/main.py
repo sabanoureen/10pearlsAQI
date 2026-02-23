@@ -32,30 +32,36 @@ def health():
 import os
 import joblib
 
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+MODEL_DIR = os.path.join(BASE_DIR, "models")
+
 def load_production_model(horizon: int):
 
-    registry = get_model_registry()
-
-    doc = registry.find_one({
-        "horizon": horizon,
-        "is_best": True
-    })
-
-    if not doc:
-        raise HTTPException(status_code=404, detail="No production model found")
-
-    model_path = doc["model_path"]
-
-    if not os.path.isabs(model_path):
-        BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        model_path = os.path.join(BASE_DIR, model_path)
+    model_path = os.path.join(MODEL_DIR, f"rf_h{horizon}.pkl")
 
     if not os.path.exists(model_path):
-        raise HTTPException(status_code=500, detail="Model file not found on disk")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Model file not found at {model_path}"
+        )
 
     model = joblib.load(model_path)
 
-    return model, doc["features"]
+    # Since features are same for all models, hardcode or load from registry if needed
+    feature_columns = [
+        "hour",
+        "day",
+        "month",
+        "lag_1",
+        "lag_3",
+        "lag_6",
+        "roll_mean_6",
+        "roll_mean_12",
+    ]
+
+    model_name = f"RandomForest_h{horizon}"
+
+    return model, feature_columns, model_name
 
 # ---------------------------------------------------
 # GET LATEST FEATURE ROW (FROM FEATURE STORE)
