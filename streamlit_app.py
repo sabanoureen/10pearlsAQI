@@ -23,26 +23,27 @@ st.markdown("---")
 
 FORECAST_URL = "https://web-production-382ce.up.railway.app/forecast"
 
+import time
+
 @st.cache_data(ttl=60)
 def fetch_forecast():
-    try:
-        r = requests.get(
-            FORECAST_URL,
-            timeout=30   # increase timeout (Railway cold start fix)
-        )
+    retries = 3
+    for attempt in range(retries):
+        try:
+            r = requests.get(FORECAST_URL, timeout=60)
+            r.raise_for_status()
+            return r.json()
 
-        st.write("Status Code:", r.status_code)
+        except requests.exceptions.ReadTimeout:
+            if attempt < retries - 1:
+                time.sleep(5)  # wait before retry
+            else:
+                st.error("Backend is waking up (Railway cold start). Please refresh in a few seconds.")
+                return None
 
-        r.raise_for_status()
-
-        data = r.json()
-        st.write("API Response:", data)
-
-        return data
-
-    except Exception as e:
-        st.error(f"Connection error: {e}")
-        return None
+        except Exception as e:
+            st.error(f"Connection error: {e}")
+            return None
 results = fetch_forecast()
 
 if results is None:
