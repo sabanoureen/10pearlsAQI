@@ -4,6 +4,7 @@ import joblib
 import io
 from gridfs import GridFS
 import pandas as pd
+from bson import ObjectId
 
 from app.db.mongo import (
     get_database,
@@ -13,9 +14,9 @@ from app.db.mongo import (
 
 app = FastAPI(title="Karachi AQI Backend")
 
-# ==========================
+# ======================================================
 # HEALTH
-# ==========================
+# ======================================================
 
 @app.get("/health")
 @app.head("/health")
@@ -29,15 +30,15 @@ def root():
         "message": "AQI Backend Running"
     }
 
-# ==========================
-# GLOBAL CACHE
-# ==========================
+# ======================================================
+# GLOBAL MODEL CACHE (LAZY LOAD ONLY)
+# ======================================================
 
 models_cache = {}
 
-# ==========================
-# LOAD MODEL
-# ==========================
+# ======================================================
+# LOAD PRODUCTION MODEL FROM GRIDFS
+# ======================================================
 
 def load_production_model(horizon: int):
 
@@ -53,14 +54,17 @@ def load_production_model(horizon: int):
     if not doc:
         raise HTTPException(status_code=404, detail="No production model found")
 
+    if "gridfs_id" not in doc:
+        raise HTTPException(status_code=500, detail="Model missing gridfs_id")
+
     model_bytes = fs.get(doc["gridfs_id"]).read()
     model = joblib.load(io.BytesIO(model_bytes))
 
-    return model, doc["features"]
+    return model, doc["features"], doc
 
-# ==========================
-# GET LATEST FEATURES
-# ==========================
+# ======================================================
+# GET LATEST FEATURE ROW
+# ======================================================
 
 def get_latest_feature_row(feature_columns):
 
@@ -88,9 +92,9 @@ def get_latest_feature_row(feature_columns):
 
     return pd.DataFrame([row_dict])
 
-# ==========================
-# FORECAST (LAZY LOAD)
-# ==========================
+# ======================================================
+# FORECAST ENDPOINT
+# ======================================================
 
 @app.get("/forecast")
 def forecast():
@@ -99,9 +103,9 @@ def forecast():
 
     for horizon in [1, 2, 3]:
 
-        # Load only once
+        # Lazy load
         if horizon not in models_cache:
-            model, features = load_production_model(horizon)
+            model, features, _ = load_production_model(horizon)
             models_cache[horizon] = (model, features)
 
         model, features = models_cache[horizon]
@@ -119,3 +123,64 @@ def forecast():
         }
 
     return results
+
+# ======================================================
+# BEST PRODUCTION MODEL
+# ======================================================
+
+@app.get("/models/best")
+def best_model():
+
+    registry = get_model_registry()
+
+    doc = registry.find_one({"is_best": True})
+
+    if not doc:
+        return {
+            "status": "error",
+            "message": "No best model found"
+        }
+
+    # Convert ObjectId safely
+    doc["_id"] = str(doc["_id"])
+
+    if "gridfs_id" in doc:
+        doc["gridfs_id"] = str(doc["gridfs_id"])
+
+    return {
+        "status": "success",
+        "model": doc
+    }
+
+# ======================================================
+# FEATURE IMPORTANCE
+# ======================================================
+
+@app.get("/features/importance")
+def feature_importance(horizon: int = 1):
+
+    # Lazy load model
+    if horizon not in models_cache:
+        model, features, _ = load_production_model(horizon)
+        models_cache[horizon] = (model, features)
+
+    model, features = models_cache[horizon]
+
+    if not hasattr(model, "feature_importances_"):
+        return {
+            "status": "error",
+            "message": "Model does not support feature importance"
+        }
+
+    data = [
+        {
+            "feature": f,
+            "importance": float(i)
+        }
+        for f, i in zip(features, model.feature_importances_)
+    ]
+
+    return {
+        "status": "success",
+        "features": data
+    }
