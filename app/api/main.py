@@ -240,3 +240,7 @@ def train_endpoint(horizon: int):
         "status": "success",
         "message": f"Model trained inside Railway for horizon {horizon}"
     }
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
