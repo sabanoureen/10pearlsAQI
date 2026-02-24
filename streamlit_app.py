@@ -21,13 +21,14 @@ st.markdown("---")
 # BACKEND API
 # ==========================================================
 
+import time
+import requests
+
 FORECAST_URL = "https://web-production-382ce.up.railway.app/forecast"
 
-import time
-
-@st.cache_data(ttl=60)
 def fetch_forecast():
     retries = 3
+
     for attempt in range(retries):
         try:
             r = requests.get(FORECAST_URL, timeout=60)
@@ -36,15 +37,20 @@ def fetch_forecast():
 
         except requests.exceptions.ReadTimeout:
             if attempt < retries - 1:
-                time.sleep(5)  # wait before retry
+                time.sleep(5)
             else:
-                st.error("Backend is waking up (Railway cold start). Please refresh in a few seconds.")
-                return None
+                st.warning("⚠ Backend is waking up (Railway cold start). Please refresh in 10 seconds.")
+                return "cold_start"
 
         except Exception as e:
             st.error(f"Connection error: {e}")
             return None
+
+
 results = fetch_forecast()
+
+if results == "cold_start":
+    st.stop()
 
 if results is None:
     st.error("❌ Failed to connect to backend API.")
