@@ -24,42 +24,36 @@ st.markdown("---")
 
 FORECAST_URL = "https://web-production-382ce.up.railway.app/forecast"
 
+
 @st.cache_data(ttl=120)
 def fetch_forecast():
-    retries = 3
-    backoff = 5
+    """
+    Handles Railway cold start automatically.
+    Waits up to 60 seconds before failing.
+    """
 
-    for attempt in range(retries):
+    max_wait = 60     # total wait time (seconds)
+    interval = 5      # retry every 5 seconds
+    waited = 0
+
+    while waited < max_wait:
         try:
             response = requests.get(FORECAST_URL, timeout=30)
             response.raise_for_status()
             return response.json()
 
-        except requests.exceptions.ReadTimeout:
-            if attempt < retries - 1:
-                time.sleep(backoff)
-                backoff *= 2
-            else:
-                st.warning("⚠ Backend may be waking up. Please refresh in 10 seconds.")
-                return None
+        except requests.exceptions.RequestException:
+            time.sleep(interval)
+            waited += interval
 
-        except requests.exceptions.HTTPError as e:
-            st.error(f"HTTP Error: {e.response.status_code}")
-            return None
-
-        except requests.exceptions.ConnectionError:
-            st.error("❌ Unable to connect to backend server.")
-            return None
-
-        except Exception as e:
-            st.error(f"Unexpected error: {e}")
-            return None
+    return None
 
 
-with st.spinner("🔄 Fetching latest AQI forecast..."):
+with st.spinner("🔄 Connecting to backend and generating forecast..."):
     results = fetch_forecast()
 
 if not results:
+    st.error("❌ Backend did not respond. Please try again in a moment.")
     st.stop()
 
 # ==========================================================
@@ -84,7 +78,7 @@ def aqi_category(value):
 
 def create_gauge(value, date_label):
 
-    category, color = aqi_category(value)
+    category, _ = aqi_category(value)
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
@@ -195,5 +189,6 @@ st.info(f"""
 • {results["2_day"]["date"]} → AQI: {results["2_day"]["value"]}  
 • {results["3_day"]["date"]} → AQI: {results["3_day"]["value"]}  
 
-Predictions generated using automated MLOps pipeline (Feature Pipeline → Model Registry → Production Deployment).
+Predictions generated via automated MLOps pipeline  
+(Feature Pipeline → Model Registry → GridFS → Railway Production Deployment).
 """)
