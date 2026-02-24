@@ -2,15 +2,15 @@
 
 ## Production-Grade Multi-Horizon Air Quality Forecasting Platform
 
-# 🔗 Live System
+## 🔗 Live System
 
-## 🔗 Live Streamlit Dashboard
+### 🔗 Live Streamlit Dashboard
 https://10pearlsaqi-sjufhvkf5fs5tbumj4ztn4.streamlit.app/
 
-## 🔗 Production Backend API (Railway)
+### 🔗 Production Backend API (Railway)
 https://web-production-382ce.up.railway.app
 
-# 🚀 Project Overview
+## 🚀 Project Overview
 
 This is a production-grade, multi-horizon Air Quality Index (AQI) forecasting system built using modern MLOps principles.
 
@@ -34,9 +34,9 @@ Deploys best models via FastAPI
 
 Serves predictions through a professional Streamlit dashboard
 
-# 🔄 Data Pipeline
+## 🔄 Data Pipeline
 
-## 1️⃣ Data Ingestion
+### 1️⃣ Data Ingestion
 
 The system collects:
 
@@ -46,7 +46,7 @@ Live weather data (temperature, humidity, wind speed, pressure)
 
 Weather data is aligned with AQI timestamps to build a unified dataset.
 
-## 2️⃣ Exploratory Data Analysis (EDA)
+### 2️⃣ Exploratory Data Analysis (EDA)
 
 Before modeling, the system performs:
 
@@ -62,7 +62,7 @@ Missing value analysis
 
 This ensures model robustness and interpretability.
 
-## 3️⃣ Feature Engineering
+### 3️⃣ Feature Engineering
 
 Advanced time-series features are created:
 
@@ -82,7 +82,7 @@ Multi-horizon targets (H1, H2, H3)
 
 Engineered features are stored in MongoDB Atlas as a Feature Store.
 
-# 🏗️ System Architecture
+## 🏗️ System Architecture
 
 External Data Sources
    │
@@ -145,9 +145,9 @@ Railway Deployment (Docker)
           ▼
 Streamlit Dashboard
 
-# 🔬 Methodology
+## 🔬 Methodology
 
-1️⃣ Data Engineering
+### 1️⃣ Data Engineering
 
 Historical hourly AQI dataset
 
@@ -161,7 +161,7 @@ Time-based features
 
 Stored in MongoDB Atlas (Feature Store)
 
-# 2️⃣ Multi-Horizon Modeling Strategy
+### 2️⃣ Multi-Horizon Modeling Strategy
 
 Instead of recursive forecasting, the system uses:
 
@@ -185,7 +185,7 @@ H2 → 48h
 
 H3 → 72h
 
-# 📊 Model Benchmark
+## 📊 Model Benchmark
 
 Evaluation metric:
 
@@ -199,9 +199,9 @@ RMSE (Root Mean Squared Error)
 
 🏆 **Random Forest selected as production model
 
-# 🧩 Backend – FastAPI (Production API)
+## 🧩 Backend – FastAPI (Production API)
 
-## Endpoints
+### Endpoints
 
 | Endpoint               | Description           |
 | ---------------------- | --------------------- |
@@ -229,7 +229,7 @@ CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
 
 Railway dynamically injects the PORT environment variable.
 
-# ☁️ Deployment Architecture
+## ☁️ Deployment Architecture
 
 🚂 Backend → Railway
 
@@ -249,7 +249,7 @@ MongoDB URI
 
 API URL
 
-# 📊 Streamlit Dashboard Features
+## 📊 Streamlit Dashboard Features
 
 ✔ Multi-day AQI gauge charts
 ✔ Forecast trend visualization
@@ -259,7 +259,7 @@ API URL
 ✔ Dark professional UI
 ✔ Retry & backend health handling
 
-# 🔐 Environment Variables
+## 🔐 Environment Variables
 Railway
 
 MONGODB_URI=your_mongodb_connection_string
@@ -269,7 +269,7 @@ Streamlit Secrets
 MONGODB_URI="..."
 API_URL="https://web-production-382ce.up.railway.app"
 
-# 🧠 Advanced Features
+## 🧠 Advanced Features
 
 🧩 Advanced System Capabilities
 
@@ -289,7 +289,7 @@ Dockerized deployment
 
 Cloud-based scalable inference
 
-# ⚙️ Tech Stack
+## ⚙️ Tech Stack
 
 Python 3.11
 
@@ -309,7 +309,7 @@ Plotly
 
 SHAP
 
-# 📌 Engineering Challenges Solved
+## 📌 Engineering Challenges Solved
 
 Docker port configuration on Railway
 
@@ -329,7 +329,7 @@ Streamlit–Railway communication debugging
 
 Production deployment stability
 
-# 🎯 Future Improvements
+## 🎯 Future Improvements
 
 CI/CD with GitHub Actions
 
