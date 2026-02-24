@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import requests
+import time
 
 # ==========================================================
 # CONFIG
@@ -21,43 +22,48 @@ st.markdown("---")
 # BACKEND API
 # ==========================================================
 
-import time
-import requests
-
 FORECAST_URL = "https://web-production-382ce.up.railway.app/forecast"
 
+@st.cache_data(ttl=120)
 def fetch_forecast():
     retries = 3
+    backoff = 5
 
     for attempt in range(retries):
         try:
-            r = requests.get(FORECAST_URL, timeout=60)
-            r.raise_for_status()
-            return r.json()
+            response = requests.get(FORECAST_URL, timeout=30)
+            response.raise_for_status()
+            return response.json()
 
         except requests.exceptions.ReadTimeout:
             if attempt < retries - 1:
-                time.sleep(5)
+                time.sleep(backoff)
+                backoff *= 2
             else:
-                st.warning("⚠ Backend is waking up (Railway cold start). Please refresh in 10 seconds.")
-                return "cold_start"
+                st.warning("⚠ Backend may be waking up. Please refresh in 10 seconds.")
+                return None
+
+        except requests.exceptions.HTTPError as e:
+            st.error(f"HTTP Error: {e.response.status_code}")
+            return None
+
+        except requests.exceptions.ConnectionError:
+            st.error("❌ Unable to connect to backend server.")
+            return None
 
         except Exception as e:
-            st.error(f"Connection error: {e}")
+            st.error(f"Unexpected error: {e}")
             return None
 
 
-results = fetch_forecast()
+with st.spinner("🔄 Fetching latest AQI forecast..."):
+    results = fetch_forecast()
 
-if results == "cold_start":
-    st.stop()
-
-if results is None:
-    st.error("❌ Failed to connect to backend API.")
+if not results:
     st.stop()
 
 # ==========================================================
-# AQI COLOR LOGIC
+# AQI CATEGORY LOGIC
 # ==========================================================
 
 def aqi_category(value):
@@ -153,11 +159,16 @@ fig.add_trace(go.Scatter(
     name="AQI Forecast"
 ))
 
-fig.update_layout(height=450)
+fig.update_layout(
+    height=450,
+    xaxis_title="Date",
+    yaxis_title="AQI Value"
+)
+
 st.plotly_chart(fig, use_container_width=True)
 
 # ==========================================================
-# HEALTH ALERT SECTION
+# HEALTH ADVISORY
 # ==========================================================
 
 st.markdown("---")
@@ -184,5 +195,5 @@ st.info(f"""
 • {results["2_day"]["date"]} → AQI: {results["2_day"]["value"]}  
 • {results["3_day"]["date"]} → AQI: {results["3_day"]["value"]}  
 
-Predictions generated using automated MLOps pipeline.
+Predictions generated using automated MLOps pipeline (Feature Pipeline → Model Registry → Production Deployment).
 """)
