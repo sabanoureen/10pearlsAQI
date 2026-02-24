@@ -67,19 +67,7 @@ def load_production_model(horizon: int):
 # LOAD MODELS ON STARTUP (CRITICAL FIX)
 # =====================================================
 
-@app.on_event("startup")
-def load_models_on_startup():
-    print("🔄 Loading models into memory...")
 
-    for horizon in [1, 2, 3]:
-        try:
-            model, features = load_production_model(horizon)
-            models_cache[horizon] = (model, features)
-            print(f"✅ Loaded model for horizon {horizon}")
-        except Exception as e:
-            print(f"❌ Failed to load model for horizon {horizon}: {e}")
-
-    print("🚀 Startup complete.")
 
 # =====================================================
 # GET LATEST FEATURE ROW
@@ -116,7 +104,6 @@ def get_latest_feature_row(feature_columns):
 # FAST FORECAST (NOW OPTIMIZED)
 # =====================================================
 
-models_cache = {}
 
 @app.get("/forecast")
 def forecast():
