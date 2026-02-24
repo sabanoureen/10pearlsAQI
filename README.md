@@ -84,27 +84,50 @@ Engineered features are stored in MongoDB Atlas as a Feature Store.
 
 ## 🏗️ System Architecture
 
-flowchart TD
-
-A[External Data Sources] --> B[Data Ingestion Layer]
-B --> C[Exploratory Data Analysis]
-C --> D[Feature Engineering Pipeline]
-D --> E[MongoDB Atlas]
-
-E --> F[Model Training Pipeline]
-F --> G[Model Evaluation]
-G --> H[Best Model Selection]
-H --> I[GridFS Model Storage]
-
-I --> J[FastAPI Inference API]
-J --> K[Railway Deployment]
-K --> L[Streamlit Dashboard]
-
-A1[Historical AQI Data] --> A
-A2[Live Weather API] --> A
-
-E1[Feature Store] --> E
-E2[Model Registry] --> E
+External Data Sources
+   │
+   ├── Historical AQI Data (5 Months)
+   └── Live Weather API
+          │
+          ▼
+Data Ingestion Layer
+   │
+   ├── Cleaning
+   ├── Missing Value Handling
+   └── Time Alignment
+          │
+          ▼
+Exploratory Data Analysis (EDA)
+          │
+          ▼
+Feature Engineering Pipeline
+          │
+          ▼
+MongoDB Atlas
+   │
+   ├── Feature Store
+   └── Model Registry
+          │
+          ▼
+Model Training Pipeline
+          │
+          ▼
+Model Evaluation
+          │
+          ▼
+Best Model Selection
+          │
+          ▼
+GridFS Model Storage
+          │
+          ▼
+FastAPI Inference API
+          │
+          ▼
+Railway (Docker Deployment)
+          │
+          ▼
+Streamlit Dashboard
 
 ## 🔬 Methodology
 
