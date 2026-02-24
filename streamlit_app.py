@@ -24,37 +24,29 @@ st.markdown("---")
 
 FORECAST_URL = "https://web-production-382ce.up.railway.app/forecast"
 
-
-@st.cache_data(ttl=120)
 def fetch_forecast():
-    """
-    Handles Railway cold start automatically.
-    Waits up to 60 seconds before failing.
-    """
+    try:
+        response = requests.get(FORECAST_URL, timeout=30)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        return None
 
-    max_wait = 60     # total wait time (seconds)
-    interval = 5      # retry every 5 seconds
-    waited = 0
 
-    while waited < max_wait:
-        try:
-            response = requests.get(FORECAST_URL, timeout=30)
-            response.raise_for_status()
-            return response.json()
+results = fetch_forecast()
 
-        except requests.exceptions.RequestException:
-            time.sleep(interval)
-            waited += interval
+if results is None:
+    st.warning("⚠ Backend may be waking up (Railway cold start).")
 
-    return None
+    if st.button("🔄 Retry Connection"):
+        st.rerun()
 
+    st.stop()
 
 with st.spinner("🔄 Connecting to backend and generating forecast..."):
     results = fetch_forecast()
 
-if not results:
-    st.error("❌ Backend did not respond. Please try again in a moment.")
-    st.stop()
+
 
 # ==========================================================
 # AQI CATEGORY LOGIC
