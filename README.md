@@ -84,66 +84,27 @@ Engineered features are stored in MongoDB Atlas as a Feature Store.
 
 ## 🏗️ System Architecture
 
-External Data Sources
-   │
-   ├── Historical AQI Data (5 Months)
-   └── Live Weather API (Temperature, Humidity, Wind, Pressure)
-          │
-          ▼
-Data Ingestion Layer
-   │
-   ├── Data Cleaning
-   ├── Missing Value Handling
-   └── Time Alignment
-          │
-          ▼
-Exploratory Data Analysis (EDA)
-   │
-   ├── Distribution Analysis
-   ├── Correlation Study
-   ├── Seasonality & Trend Detection
-   └── Outlier Detection
-          │
-          ▼
-Feature Engineering Pipeline
-   │
-   ├── Lag Features (t-1, t-24, t-48)
-   ├── Rolling Mean / Std
-   ├── Time-Based Features
-   ├── Weather Interaction Features
-   └── Multi-Horizon Targets
-          │
-          ▼
-MongoDB Atlas
-   │
-   ├── Feature Store (Engineered Features)
-   └── Model Registry
-          │
-          ▼
-Model Training Pipeline
-   │
-   ├── Random Forest
-   ├── Gradient Boosting
-   ├── Ridge Regression
-   └── Hyperparameter Tuning
-          │
-          ▼
-Model Evaluation (RMSE, MAE, R²)
-          │
-          ▼
-Best Model Selection
-          │
-          ▼
-GridFS (Model Storage)
-          │
-          ▼
-FastAPI Inference API
-          │
-          ▼
-Railway Deployment (Docker)
-          │
-          ▼
-Streamlit Dashboard
+flowchart TD
+
+A[External Data Sources] --> B[Data Ingestion Layer]
+B --> C[Exploratory Data Analysis]
+C --> D[Feature Engineering Pipeline]
+D --> E[MongoDB Atlas]
+
+E --> F[Model Training Pipeline]
+F --> G[Model Evaluation]
+G --> H[Best Model Selection]
+H --> I[GridFS Model Storage]
+
+I --> J[FastAPI Inference API]
+J --> K[Railway Deployment]
+K --> L[Streamlit Dashboard]
+
+A1[Historical AQI Data] --> A
+A2[Live Weather API] --> A
+
+E1[Feature Store] --> E
+E2[Model Registry] --> E
 
 ## 🔬 Methodology
 
