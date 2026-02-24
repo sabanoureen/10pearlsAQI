@@ -1,8 +1,8 @@
 # 🌍 Karachi AQI Forecast System
 
-## Production-Grade Multi-Horizon Air Quality Forecasting Platform
+### Production-Grade Multi-Horizon Air Quality Forecasting Platform
 
-## 🔗 Live System
+### 🔗 Live System
 
 ### 🔗 Live Streamlit Dashboard
 https://10pearlsaqi-sjufhvkf5fs5tbumj4ztn4.streamlit.app/
@@ -10,7 +10,7 @@ https://10pearlsaqi-sjufhvkf5fs5tbumj4ztn4.streamlit.app/
 ### 🔗 Production Backend API (Railway)
 https://web-production-382ce.up.railway.app
 
-## 🚀 Project Overview
+### 🚀 Project Overview
 
 This is a production-grade, multi-horizon Air Quality Index (AQI) forecasting system built using modern MLOps principles.
 
@@ -151,7 +151,7 @@ Streamlit Dashboard
 
 Historical hourly AQI dataset
 
-## Feature engineering:
+### Feature engineering:
 
 Lag features
 
@@ -169,7 +169,7 @@ Instead of recursive forecasting, the system uses:
 ✔ Horizon-specific training
 ✔ Independent optimization
 
-## Models trained:
+### Models trained:
 
 Random Forest
 
@@ -185,7 +185,7 @@ H2 → 48h
 
 H3 → 72h
 
-## 📊 Model Benchmark
+### 📊 Model Benchmark
 
 Evaluation metric:
 
@@ -199,7 +199,7 @@ RMSE (Root Mean Squared Error)
 
 🏆 **Random Forest selected as production model
 
-## 🧩 Backend – FastAPI (Production API)
+### 🧩 Backend – FastAPI (Production API)
 
 ### Endpoints
 
@@ -212,7 +212,7 @@ RMSE (Root Mean Squared Error)
 | `/features/importance` | Feature importance    |
 | `/forecast/shap`       | SHAP explainability   |
 
-## 🐳 Docker Deployment
+### 🐳 Docker Deployment
 
 Backend runs inside Docker on Railway:
 
@@ -229,7 +229,7 @@ CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
 
 Railway dynamically injects the PORT environment variable.
 
-## ☁️ Deployment Architecture
+### ☁️ Deployment Architecture
 
 🚂 Backend → Railway
 
@@ -249,7 +249,7 @@ MongoDB URI
 
 API URL
 
-## 📊 Streamlit Dashboard Features
+### 📊 Streamlit Dashboard Features
 
 ✔ Multi-day AQI gauge charts
 ✔ Forecast trend visualization
@@ -259,7 +259,7 @@ API URL
 ✔ Dark professional UI
 ✔ Retry & backend health handling
 
-## 🔐 Environment Variables
+### 🔐 Environment Variables
 Railway
 
 MONGODB_URI=your_mongodb_connection_string
@@ -269,7 +269,7 @@ Streamlit Secrets
 MONGODB_URI="..."
 API_URL="https://web-production-382ce.up.railway.app"
 
-## 🧠 Advanced Features
+### 🧠 Advanced Features
 
 🧩 Advanced System Capabilities
 
@@ -289,7 +289,7 @@ Dockerized deployment
 
 Cloud-based scalable inference
 
-## ⚙️ Tech Stack
+### ⚙️ Tech Stack
 
 Python 3.11
 
@@ -309,7 +309,7 @@ Plotly
 
 SHAP
 
-## 📌 Engineering Challenges Solved
+### 📌 Engineering Challenges Solved
 
 Docker port configuration on Railway
 
@@ -329,7 +329,7 @@ Streamlit–Railway communication debugging
 
 Production deployment stability
 
-## 🎯 Future Improvements
+### 🎯 Future Improvements
 
 CI/CD with GitHub Actions
 
@@ -347,7 +347,7 @@ Monitoring & logging dashboard
 
 Authentication & role-based access
 
-# 👩‍💻 Author
+## 👩‍💻 Author
 
 Saba Noureen
 MS Data Science
