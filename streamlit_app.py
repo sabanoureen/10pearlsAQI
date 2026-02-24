@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import requests
-import time
 
 # ==========================================================
 # CONFIG
@@ -14,64 +13,82 @@ st.set_page_config(
     layout="wide"
 )
 
+# ==========================================================
+# STYLING
+# ==========================================================
+
+st.markdown("""
+<style>
+.big-font {
+    font-size:20px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================================
+# HEADER
+# ==========================================================
+
 st.title("🌍 Karachi AQI Forecast System")
 st.markdown("AI-Powered Multi-Horizon Air Quality Prediction")
 st.markdown("---")
 
 # ==========================================================
-# BACKEND API
+# API URLS
 # ==========================================================
 
-FORECAST_URL = "https://web-production-382ce.up.railway.app/forecast"
+BASE_URL = "https://web-production-382ce.up.railway.app"
+FORECAST_URL = f"{BASE_URL}/forecast"
+BEST_MODEL_URL = f"{BASE_URL}/models/best"
+FEATURE_URL = f"{BASE_URL}/features/importance?horizon=1"
+METRICS_URL = f"{BASE_URL}/models/metrics"
 
-def fetch_forecast():
+# ==========================================================
+# FETCH FUNCTION
+# ==========================================================
+
+def safe_request(url, timeout=60):
     try:
-        response = requests.get(FORECAST_URL, timeout=120)
-        response.raise_for_status()
-        return response.json()
-
+        r = requests.get(url, timeout=timeout)
+        r.raise_for_status()
+        return r.json()
     except requests.exceptions.HTTPError as e:
         st.error(f"HTTP Error: {e}")
-        return None
-
     except requests.exceptions.ConnectionError:
         st.error("Connection error to backend.")
-        return None
-
     except requests.exceptions.Timeout:
         st.error("Request timed out.")
-        return None
-
     except Exception as e:
         st.error(f"Unexpected error: {e}")
-        return None
+    return None
 
+# ==========================================================
+# FETCH FORECAST
+# ==========================================================
 
 with st.spinner("🔄 Connecting to backend and generating forecast..."):
-    results = fetch_forecast()
+    results = safe_request(FORECAST_URL, timeout=120)
 
 if results is None:
     if st.button("🔄 Retry Connection"):
         st.rerun()
     st.stop()
 
-
-
 # ==========================================================
-# AQI CATEGORY LOGIC
+# AQI CATEGORY
 # ==========================================================
 
 def aqi_category(value):
     if value <= 50:
-        return "Good", "green"
+        return "Good"
     elif value <= 100:
-        return "Moderate", "yellow"
+        return "Moderate"
     elif value <= 150:
-        return "Unhealthy for Sensitive Groups", "orange"
+        return "Unhealthy for Sensitive Groups"
     elif value <= 200:
-        return "Unhealthy", "red"
+        return "Unhealthy"
     else:
-        return "Hazardous", "purple"
+        return "Hazardous"
 
 # ==========================================================
 # GAUGE FUNCTION
@@ -79,7 +96,7 @@ def aqi_category(value):
 
 def create_gauge(value, date_label):
 
-    category, _ = aqi_category(value)
+    category = aqi_category(value)
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
@@ -193,3 +210,82 @@ st.info(f"""
 Predictions generated via automated MLOps pipeline  
 (Feature Pipeline → Model Registry → GridFS → Railway Production Deployment).
 """)
+
+# ==========================================================
+# BEST MODEL SECTION
+# ==========================================================
+
+st.markdown("---")
+st.markdown("## 🏆 Best Production Model")
+
+best_model_data = safe_request(BEST_MODEL_URL)
+
+if best_model_data and "model" in best_model_data:
+    best_model = best_model_data["model"]
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.metric("Model Name", best_model.get("model_name", "N/A"))
+        st.metric("Algorithm", best_model.get("algorithm", "N/A"))
+
+    with col2:
+        st.metric("RMSE", round(best_model.get("rmse", 0), 2))
+        st.metric("R² Score", round(best_model.get("r2", 0), 3))
+else:
+    st.warning("Best model details unavailable.")
+
+# ==========================================================
+# FEATURE IMPORTANCE
+# ==========================================================
+
+st.markdown("---")
+st.markdown("## 📊 Top Feature Importance")
+
+feature_data = safe_request(FEATURE_URL)
+
+if feature_data and "features" in feature_data:
+
+    df = pd.DataFrame(feature_data["features"])
+    df = df.sort_values("importance", ascending=False).head(10)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Bar(
+        x=df["importance"],
+        y=df["feature"],
+        orientation="h"
+    ))
+
+    fig.update_layout(
+        height=500,
+        yaxis=dict(autorange="reversed"),
+        xaxis_title="Importance Score"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.warning("Feature importance unavailable.")
+
+# ==========================================================
+# MODEL COMPARISON
+# ==========================================================
+
+st.markdown("---")
+st.markdown("## 📈 Model Comparison")
+
+metrics_data = safe_request(METRICS_URL)
+
+if metrics_data and "models" in metrics_data:
+    df_models = pd.DataFrame(metrics_data["models"])
+    st.dataframe(df_models, use_container_width=True)
+else:
+    st.warning("Model metrics unavailable.")
+
+# ==========================================================
+# SIDEBAR
+# ==========================================================
+
+st.sidebar.header("⚙ Dashboard Controls")
+st.sidebar.write("Multi-horizon forecasting system")
+st.sidebar.write("Production deployment on Railway")
