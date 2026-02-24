@@ -13,6 +13,10 @@ from app.db.mongo import (
 
 
 app = FastAPI(title="Karachi AQI Backend")
+@app.get("/health")
+@app.head("/health")
+def health():
+    return {"status": "ok"}
 
 
 # ---------------------------------------------------
@@ -241,14 +245,5 @@ def train_endpoint(horizon: int):
         "message": f"Model trained inside Railway for horizon {horizon}"
     }
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
 
 
-app = FastAPI()
-
-@app.get("/health")
-@app.head("/health")
-def health():
-    return {"status": "ok"}
