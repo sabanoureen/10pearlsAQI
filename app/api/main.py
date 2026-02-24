@@ -138,14 +138,27 @@ def forecast():
 # MODEL METRICS
 # =====================================================
 
+from bson import ObjectId
+
 @app.get("/models/metrics")
 def metrics():
+
     registry = get_model_registry()
-    docs = list(registry.find({}, {"_id": 0}))
+    docs = list(registry.find({}))
+
+    clean_docs = []
+
+    for doc in docs:
+        doc["_id"] = str(doc["_id"])
+
+        if "gridfs_id" in doc:
+            doc["gridfs_id"] = str(doc["gridfs_id"])
+
+        clean_docs.append(doc)
 
     return {
         "status": "success",
-        "models": docs
+        "models": clean_docs
     }
 
 
@@ -153,27 +166,30 @@ def metrics():
 # BEST MODEL
 # =====================================================
 
+from bson import ObjectId
+
 @app.get("/models/best")
 def best_model():
 
     registry = get_model_registry()
 
-    doc = registry.find_one({
-        "status": "production",
-        "is_best": True
-    }, {"_id": 0})
+    doc = registry.find_one({"is_best": True})
 
     if not doc:
-        raise HTTPException(
-            status_code=404,
-            detail="No production model found"
-        )
+        return {
+            "status": "error",
+            "message": "No best model found"
+        }
+
+    doc["_id"] = str(doc["_id"])
+
+    if "gridfs_id" in doc:
+        doc["gridfs_id"] = str(doc["gridfs_id"])
 
     return {
         "status": "success",
         "model": doc
     }
-
 
 # =====================================================
 # FEATURE IMPORTANCE
