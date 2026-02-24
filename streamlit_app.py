@@ -26,7 +26,7 @@ FORECAST_URL = "https://web-production-382ce.up.railway.app/forecast"
 
 def fetch_forecast():
     try:
-        response = requests.get(FORECAST_URL, timeout=30)
+        response = requests.get(FORECAST_URL, timeout=120)
         response.raise_for_status()
         return response.json()
 
