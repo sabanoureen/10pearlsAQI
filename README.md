@@ -4,8 +4,7 @@ AI-Powered Multi-Horizon Air Quality Prediction
 Production-Grade MLOps System for Multi-Horizon Time Series Forecasting
 
 🔗 Live Streamlit App:
-https://10pearlsaqi-4gpbzmccfuqust2wshwqt.streamlit.app
-https://10pearlsaqi-4gpbzmccfuqust2wshwqt.streamlit.app/
+https://10pearlsaqi-sjufhvkf5fs5tbumj4ztn4.streamlit.app/
 
 🔗 Production Backend API (Railway):
 https://web-production-382ce.up.railway.app
