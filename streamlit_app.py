@@ -29,22 +29,31 @@ def fetch_forecast():
         response = requests.get(FORECAST_URL, timeout=30)
         response.raise_for_status()
         return response.json()
+
+    except requests.exceptions.HTTPError as e:
+        st.error(f"HTTP Error: {e}")
+        return None
+
+    except requests.exceptions.ConnectionError:
+        st.error("Connection error to backend.")
+        return None
+
+    except requests.exceptions.Timeout:
+        st.error("Request timed out.")
+        return None
+
     except Exception as e:
+        st.error(f"Unexpected error: {e}")
         return None
 
 
-results = fetch_forecast()
-
-if results is None:
-    st.warning("⚠ Backend may be waking up (Railway cold start).")
-
-    if st.button("🔄 Retry Connection"):
-        st.rerun()
-
-    st.stop()
-
 with st.spinner("🔄 Connecting to backend and generating forecast..."):
     results = fetch_forecast()
+
+if results is None:
+    if st.button("🔄 Retry Connection"):
+        st.rerun()
+    st.stop()
 
 
 
