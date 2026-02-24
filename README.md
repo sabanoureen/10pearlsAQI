@@ -1,77 +1,148 @@
 🌍 Karachi AQI Forecast System
 
-AI-Powered Multi-Horizon Air Quality Prediction
-Production-Grade MLOps System for Multi-Horizon Time Series Forecasting
+Production-Grade Multi-Horizon Air Quality Forecasting Platform
 
-🔗 Live Streamlit App:
+🔗 Live Streamlit Dashboard
 https://10pearlsaqi-sjufhvkf5fs5tbumj4ztn4.streamlit.app/
 
-🔗 Production Backend API (Railway):
+🔗 Production Backend API (Railway)
 https://web-production-382ce.up.railway.app
 
 🚀 Project Overview
 
-This project is a production-grade, multi-horizon Air Quality Index (AQI) forecasting system built using:
+This is a production-grade, multi-horizon Air Quality Index (AQI) forecasting system built using modern MLOps principles.
 
-FastAPI (Backend API)
+The system:
 
-Streamlit (Frontend Dashboard)
+Ingests 5 months of historical AQI data
 
-MongoDB Atlas (Feature Store + Model Registry)
+Fetches live weather data via API
 
-Railway (Dockerized backend deployment)
+Performs Exploratory Data Analysis (EDA)
 
-Streamlit Cloud (Frontend deployment)
+Engineers advanced time-series features
 
-Scikit-learn (Model training)
+Trains multiple ML models per forecast horizon
 
-Random Forest (Production model)
+Stores features in MongoDB Feature Store
 
-The system predicts AQI for:
+Registers models in MongoDB Model Registry
 
-✅ 24 hours ahead
+Deploys best models via FastAPI
 
-✅ 48 hours ahead
+Serves predictions through a professional Streamlit dashboard
 
-✅ 72 hours ahead
+🔄 Data Pipeline
+1️⃣ Data Ingestion
 
-🧠 Problem Statement
+The system collects:
 
-Karachi suffers from fluctuating air quality levels. Accurate short-term forecasting enables:
+Historical AQI data (5 months)
 
-Public health advisories
+Live weather data (temperature, humidity, wind speed, pressure)
 
-Government response planning
+Weather data is aligned with AQI timestamps to build a unified dataset.
 
-Environmental monitoring
+2️⃣ Exploratory Data Analysis (EDA)
 
-Preventive risk mitigation
+Before modeling, the system performs:
 
-This project implements a multi-horizon forecasting pipeline to predict AQI up to 3 days ahead using machine learning.
+Distribution analysis
+
+Correlation matrix between AQI & weather variables
+
+Seasonal trend identification
+
+Outlier detection
+
+Missing value analysis
+
+This ensures model robustness and interpretability.
+
+3️⃣ Feature Engineering
+
+Advanced time-series features are created:
+
+Lag features (AQI t-1, t-24, t-48)
+
+Rolling averages
+
+Rolling standard deviation
+
+Hour-of-day encoding
+
+Day-of-week encoding
+
+Weather interaction features
+
+Multi-horizon targets (H1, H2, H3)
+
+Engineered features are stored in MongoDB Atlas as a Feature Store.
 
 🏗️ System Architecture
+External Data Sources
+   │
+   ├── Historical AQI Data (5 Months)
+   └── Live Weather API (Temperature, Humidity, Wind, Pressure)
+          │
+          ▼
+Data Ingestion Layer
+   │
+   ├── Data Cleaning
+   ├── Missing Value Handling
+   └── Time Alignment
+          │
+          ▼
+Exploratory Data Analysis (EDA)
+   │
+   ├── Distribution Analysis
+   ├── Correlation Study
+   ├── Seasonality & Trend Detection
+   └── Outlier Detection
+          │
+          ▼
+Feature Engineering Pipeline
+   │
+   ├── Lag Features (t-1, t-24, t-48)
+   ├── Rolling Mean / Std
+   ├── Time-Based Features
+   ├── Weather Interaction Features
+   └── Multi-Horizon Targets
+          │
+          ▼
 MongoDB Atlas
    │
-   ├── Historical Data
-   ├── Feature Store
+   ├── Feature Store (Engineered Features)
    └── Model Registry
           │
           ▼
-Training Pipeline (Scikit-learn)
+Model Training Pipeline
+   │
+   ├── Random Forest
+   ├── Gradient Boosting
+   ├── Ridge Regression
+   └── Hyperparameter Tuning
           │
           ▼
-Production Model (Random Forest)
+Model Evaluation (RMSE, MAE, R²)
           │
           ▼
-FastAPI (Dockerized)
+Best Model Selection
           │
           ▼
-Railway Deployment
+GridFS (Model Storage)
           │
           ▼
-Streamlit Frontend
+FastAPI Inference API
+          │
+          ▼
+Railway Deployment (Docker)
+          │
+          ▼
+Streamlit Dashboard
 
 🔬 Methodology
+
 1️⃣ Data Engineering
 
 Historical hourly AQI dataset
@@ -84,11 +155,11 @@ Rolling averages
 
 Time-based features
 
-Stored in MongoDB Atlas
+Stored in MongoDB Atlas (Feature Store)
 
 2️⃣ Multi-Horizon Modeling Strategy
 
-Instead of recursive forecasting, this system uses:
+Instead of recursive forecasting, the system uses:
 
 ✔ Separate model per horizon
 ✔ Horizon-specific training
@@ -102,7 +173,7 @@ Gradient Boosting
 
 Ridge Regression
 
-Each model trained separately for:
+Each model trained independently for:
 
 H1 → 24h
 
@@ -110,13 +181,22 @@ H2 → 48h
 
 H3 → 72h
 
+2️⃣ Multi-Horizon Modeling Strategy
+
+Instead of recursive forecasting, the system uses:
+
+✔ Independent model per forecast horizon
+✔ Horizon-specific feature selection
+✔ Separate hyperparameter optimization
+✔ Dedicated performance evaluation
+
+This improves stability and reduces error propagation.
+
 3️⃣ Model Selection
 
 Evaluation metric:
 
 RMSE (Root Mean Squared Error)
-
-Results:
 
 | Horizon | Random Forest | Gradient Boosting | Ridge |
 | ------- | ------------- | ----------------- | ----- |
@@ -126,9 +206,8 @@ Results:
 
 🏆 Random Forest selected as production model
 
-🧩 Backend (FastAPI)
+🧩 Backend – FastAPI (Production API)
 Endpoints
-
 | Endpoint               | Description           |
 | ---------------------- | --------------------- |
 | `/`                    | Health check          |
@@ -136,7 +215,7 @@ Endpoints
 | `/models/metrics`      | Model registry        |
 | `/models/best`         | Best production model |
 | `/features/importance` | Feature importance    |
-| `/forecast/shap`       | SHAP explanations     |
+| `/forecast/shap`       | SHAP explainability   |
 
 🐳 Docker Configuration
 
@@ -155,12 +234,12 @@ CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
 
 Railway dynamically injects the PORT environment variable.
 
-☁️ Deployment
+☁️ Deployment Strategy
 🚂 Backend → Railway
 
 Dockerized FastAPI
 
-MongoDB Atlas connection via environment variables
+MongoDB Atlas via environment variables
 
 Auto-redeploy on GitHub push
 
@@ -179,28 +258,40 @@ API URL
 ✔ Multi-day AQI gauge charts
 ✔ Forecast trend visualization
 ✔ Model benchmark comparison
+✔ Feature importance visualization
 ✔ Executive summary
-✔ Live refresh button
+✔ Dark professional UI
+✔ Retry & backend health handling
 
 🔐 Environment Variables
 Railway
+
 MONGODB_URI=your_mongodb_connection_string
 
 Streamlit Secrets
+
 MONGODB_URI="..."
 API_URL="https://web-production-382ce.up.railway.app"
 
 🧠 Advanced Features
 
-Model registry system
+🧩 Advanced System Capabilities
 
-Automated best-model selection
+Feature Store architecture (MongoDB)
+
+Model Registry with best-model tagging
+
+GridFS model persistence
+
+Lazy model loading in production
 
 SHAP explainability
 
-Production-ready multi-model pipeline
+Multi-model benchmarking
 
-Separate training & inference architecture
+Dockerized deployment
+
+Cloud-based scalable inference
 
 ⚙️ Tech Stack
 
@@ -220,37 +311,45 @@ Scikit-learn
 
 Plotly
 
-📌 Challenges Solved
+SHAP
+
+📌 Engineering Challenges Solved
 
 Docker port configuration on Railway
 
-MongoDB Atlas connection handling
+MongoDB Atlas connection management
 
-Multi-horizon forecast logic
+Multi-horizon forecasting design
 
 Model registry architecture
 
+ObjectId serialization in FastAPI
+
 Environment variable management
 
-Streamlit–Railway communication
+Cold-start handling
 
-Production deployment debugging
+Streamlit–Railway communication debugging
+
+Production deployment stability
 
 🎯 Future Improvements
 
 CI/CD with GitHub Actions
 
-Automated daily retraining
+Automated daily retraining pipeline
 
-Redis caching
+Redis caching layer
 
-Real-time data ingestion
+Real-time AQI ingestion
 
-Alert system (SMS / Email)
+SMS / Email alert system
 
-Container scaling
+Kubernetes container scaling
 
 Monitoring & logging dashboard
+
+Authentication & role-based access
 
 👩‍💻 Author
 
@@ -258,8 +357,8 @@ Saba Noureen
 MS Data Science
 Machine Learning & AI Systems
 
-⭐ If you like this project
+⭐ If You Like This Project
 
-Please star the repository and share!
+Please ⭐ star the repository and share it.
 
 
