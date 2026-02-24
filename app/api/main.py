@@ -72,11 +72,14 @@ def load_models_on_startup():
     print("🔄 Loading models into memory...")
 
     for horizon in [1, 2, 3]:
-        model, features = load_production_model(horizon)
-        models_cache[horizon] = (model, features)
+        try:
+            model, features = load_production_model(horizon)
+            models_cache[horizon] = (model, features)
+            print(f"✅ Loaded model for horizon {horizon}")
+        except Exception as e:
+            print(f"❌ Failed to load model for horizon {horizon}: {e}")
 
-    print("✅ Models loaded successfully.")
-
+    print("🚀 Startup complete.")
 
 # =====================================================
 # GET LATEST FEATURE ROW
@@ -113,6 +116,8 @@ def get_latest_feature_row(feature_columns):
 # FAST FORECAST (NOW OPTIMIZED)
 # =====================================================
 
+models_cache = {}
+
 @app.get("/forecast")
 def forecast():
 
@@ -120,11 +125,10 @@ def forecast():
 
     for horizon in [1, 2, 3]:
 
+        # Lazy load
         if horizon not in models_cache:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Model for horizon {horizon} not loaded."
-            )
+            model, features = load_production_model(horizon)
+            models_cache[horizon] = (model, features)
 
         model, features = models_cache[horizon]
 
