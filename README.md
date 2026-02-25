@@ -143,8 +143,9 @@ The AQI Forecasting System follows a modular machine learning pipeline architect
 
 ### 📊 Architecture Diagram
 
-![AQI Architecture](docs/architecture.png)
-
+<p align="center">
+  <img src="docs/architecture.png" width="800">
+</p>
 
 ## 🔬 Methodology
 
