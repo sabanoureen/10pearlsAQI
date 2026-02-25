@@ -82,6 +82,51 @@ Multi-horizon targets (H1, H2, H3)
 
 Engineered features are stored in MongoDB Atlas as a Feature Store.
 
+---
+
+## 📊 Exploratory Data Analysis (EDA)
+
+Exploratory Data Analysis was conducted on 5 months of historical AQI and weather data (3,541 observations) to validate temporal behavior and engineered feature effectiveness prior to model training.
+
+### 🔍 Dataset Summary
+- 3,541 hourly observations
+- 19 engineered features
+- Multi-horizon targets (H1, H2, H3)
+- Lag features (lag_1, lag_3, lag_6)
+- Rolling statistics (roll_mean_6, roll_mean_12)
+- Weather pollutants (NO₂, CO, SO₂, O₃)
+
+---
+
+### 📈 Key Findings
+
+- AQI (PM2.5) shows moderate right-skewness with occasional pollution spikes.
+- Strong temporal dependency observed through lag and rolling features.
+- Nitrogen dioxide and carbon monoxide show moderate positive correlation with AQI.
+- Ozone demonstrates a negative relationship with particulate concentration.
+- Raw time features (hour, day, month) show weak linear correlation but contribute through nonlinear modeling.
+- Multicollinearity exists among engineered temporal features but is manageable under tree-based ensemble models.
+- The dataset is suitable for multi-horizon AQI forecasting.
+
+---
+
+### 📊 Visualizations Included
+
+- AQI Distribution Histogram
+- Hourly & Monthly Trend Analysis
+- Correlation Heatmap
+- Boxplot for Outlier Detection
+- Scatter Plots (Pollutant vs AQI)
+- Stationarity Discussion
+
+---
+
+### 📁 Files
+
+- Notebook: `notebooks/EDA.ipynb`
+- Dataset used for EDA: `eda_training_dataset.csv`
+
+
 ## 🏗️ System Architecture
 
 External Data Sources
