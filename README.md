@@ -129,50 +129,22 @@ Exploratory Data Analysis was conducted on 5 months of historical AQI and weathe
 
 ## 🏗️ System Architecture
 
-External Data Sources
-   │
-   ├── Historical AQI Data (5 Months)
-   └── Live Weather API
-          │
-          ▼
-Data Ingestion Layer
-   │
-   ├── Cleaning
-   ├── Missing Value Handling
-   └── Time Alignment
-          │
-          ▼
-Exploratory Data Analysis (EDA)
-          │
-          ▼
-Feature Engineering Pipeline
-          │
-          ▼
-MongoDB Atlas
-   │
-   ├── Feature Store
-   └── Model Registry
-          │
-          ▼
-Model Training Pipeline
-          │
-          ▼
-Model Evaluation
-          │
-          ▼
-Best Model Selection
-          │
-          ▼
-GridFS Model Storage
-          │
-          ▼
-FastAPI Inference API
-          │
-          ▼
-Railway (Docker Deployment)
-          │
-          ▼
-Streamlit Dashboard
+The AQI Forecasting System follows a modular machine learning pipeline architecture integrating data ingestion, feature engineering, model training, model registry, and real-time inference.
+
+### 🔄 Workflow Overview
+
+1. Historical AQI & weather data fetched via Open-Meteo API  
+2. Data stored in MongoDB (`historical_hourly_data`)
+3. Feature engineering pipeline generates lag & rolling features
+4. Multi-horizon models trained and stored in Model Registry
+5. Best model selected automatically
+6. Inference pipeline generates 1–3 day forecasts
+7. Streamlit dashboard displays predictions
+
+### 📊 Architecture Diagram
+
+![AQI Architecture](docs/architecture.png)
+
 
 ## 🔬 Methodology
 
