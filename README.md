@@ -1,5 +1,17 @@
 # 🌍 Karachi AQI Forecast System
 
+<p align="center">
+
+<img src="https://img.shields.io/badge/Python-3.11-blue?logo=python"/>
+<img src="https://img.shields.io/badge/MongoDB-Atlas-green?logo=mongodb"/>
+<img src="https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi"/>
+<img src="https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B?logo=streamlit"/>
+<img src="https://img.shields.io/badge/ML-ScikitLearn-orange?logo=scikitlearn"/>
+<img src="https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker"/>
+<img src="https://img.shields.io/badge/Deployed%20on-Railway-purple"/>
+
+</p>
+
 ### Production-Grade Multi-Horizon Air Quality Forecasting Platform
 
 ### 🔗 Live System
