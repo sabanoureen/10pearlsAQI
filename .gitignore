@@ -30,3 +30,15 @@ __pycache__/
 historical_data.csv
 *.joblib
 models/
+# Model artifacts
+*.pkl
+production_model_*.pkl
+
+# Training dataset exports
+training_dataset.csv
+
+# Local datasets
+eda_training_dataset.csv
+
+# Virtual environment
+venv/
